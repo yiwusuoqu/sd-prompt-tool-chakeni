@@ -1,2 +1,33 @@
-# sd-prompt-tool-chakeni
-stable diffusion prompt tool
+# SD提示词工具集 / SD Prompt Tools
+
+作者：差可拟check（小红书）- 抖音：差可拟check
+
+本仓库包含两个面向 Stable Diffusion / NovelAI 用户的提示词辅助工具，均为单文件 HTML，无需安装，浏览器直接打开使用。
+
+---
+
+## 工具列表
+
+### 1. AI绘画提示词系统
+- 支持 Illustrious / NoobAI / Pony / NAI V4 多模型
+- 智能匹配正向/负向提示词
+- 质量词、光照词、构图词、风格词一键组合
+- Apple 风格 UI，移动端友好
+
+### 2. 画师串生成工具
+- 收录主流风格画师权重配置
+- 支持自定义权重调整
+- 一键生成标准格式画师串
+- 中文搜索支持
+
+---
+
+## 使用方法
+
+下载对应 `.html` 文件，用浏览器（Chrome / Edge）打开即可，无需联网，无需安装任何依赖。
+
+---
+
+## 版本记录
+
+- 2026-03-30 初始版本上传存档
