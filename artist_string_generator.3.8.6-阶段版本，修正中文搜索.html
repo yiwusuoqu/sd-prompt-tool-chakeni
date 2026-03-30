@@ -1,0 +1,3126 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Illustrious 画师串生成器</title>
+<style>
+:root {
+  --bg: #fafafa; --card: #fff; --border: #e5e5e5; --text: #1a1a1a;
+  --text2: #555; --text3: #999; --accent: #2563eb; --accent-dim: rgba(37,99,235,0.08);
+  --green: #16a34a; --green-dim: rgba(22,163,74,0.08);
+  --orange: #ea580c; --orange-dim: rgba(234,88,12,0.08);
+  --red: #dc2626; --red-dim: rgba(220,38,38,0.08);
+  --radius: 10px; --font: -apple-system, 'Helvetica Neue', 'PingFang SC', 'Noto Sans SC', sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #0f0f0f; --card: #1a1a1a; --border: #2a2a2a; --text: #e5e5e5;
+  --text2: #aaa; --text3: #666; --accent: #60a5fa; --accent-dim: rgba(96,165,250,0.12);
+  --green: #4ade80; --green-dim: rgba(74,222,128,0.12);
+  --orange: #fb923c; --orange-dim: rgba(251,146,60,0.12);
+  --red: #f87171; --red-dim: rgba(248,113,113,0.12);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scrollbar-gutter: stable; }
+body { font-family: var(--font); background: transparent; color: var(--text); line-height:1.5; padding:12px 20px; transition: background 0.3s, color 0.3s; }
+.bg-layer { position:fixed; top:0; left:0; width:100%; height:100%; z-index:-2; background:rgba(250,250,250,0.75); transition:background 0.3s; }
+[data-theme="dark"] .bg-layer { background:rgba(15,15,15,0.78); }
+
+#ribbonCanvas {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  z-index:-1; pointer-events:none; opacity:0.85;
+  transition: opacity 0.3s;
+}
+[data-theme="dark"] #ribbonCanvas { opacity:0.55; }
+
+.container { max-width:800px; margin:0 auto; position:relative; z-index:1; }
+h1 { font-size:20px; font-weight:700; margin-bottom:4px; letter-spacing:-0.02em; }
+.subtitle { font-size:13px; color:var(--text3); margin-bottom:20px; }
+.author-name { font-weight:700; background:linear-gradient(135deg, #f0c040, #e06050, #c050d0, #5080f0, #40c8a0); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+
+/* Disclaimer */
+.disclaimer-section { margin-top:24px; padding:18px 22px; border-radius:var(--radius); background:rgba(0,0,0,0.03); border:1px dashed var(--border); }
+[data-theme="dark"] .disclaimer-section { background:rgba(255,255,255,0.03); }
+.disclaimer-title { font-size:13px; font-weight:600; color:var(--text3); margin-bottom:10px; }
+.disclaimer-list { list-style:none; padding:0; }
+.disclaimer-list li { font-size:12px; color:var(--text3); line-height:1.7; padding:3px 0; padding-left:14px; position:relative; }
+.disclaimer-list li::before { content:"\00B7"; position:absolute; left:2px; font-weight:700; }
+.page-footer { text-align:center; padding:16px 0 4px; font-size:12px; color:var(--text3); }
+
+/* Cards */
+.card {
+  background:rgba(255,255,255,0.65); border:1px solid rgba(229,229,229,0.5); border-radius:var(--radius);
+  padding:14px 16px; margin-bottom:10px; transition: background 0.3s, border-color 0.3s;
+  backdrop-filter:blur(12px) saturate(1.3); -webkit-backdrop-filter:blur(12px) saturate(1.3);
+  box-shadow:0 2px 8px rgba(0,0,0,0.04), 0 0 0 1px rgba(255,255,255,0.3) inset;
+}
+[data-theme="dark"] .card {
+  background:rgba(26,26,26,0.62); border-color:rgba(60,60,60,0.4);
+  box-shadow:0 2px 8px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.04) inset;
+}
+.card-title { font-size:14px; font-weight:600; color:var(--text2); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+.card-title span { font-size:12px; color:var(--text3); font-weight:400; }
+
+/* Style Filter */
+.style-filters { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px; }
+.style-btn {
+  padding:5px 14px; font-size:13px; font-weight:500; border:1px solid var(--border);
+  border-radius:20px; background:rgba(255,255,255,0.5); color:var(--text2); cursor:pointer;
+  transition: all 0.15s; font-family:var(--font);
+}
+[data-theme="dark"] .style-btn { background:rgba(40,40,40,0.5); }
+.style-btn:hover { border-color:#aaa; color:var(--text); }
+.style-btn.active { background:var(--text); color:#fff; border-color:var(--text); }
+
+/* Artist Tags */
+.artist-pool { display:flex; flex-wrap:wrap; gap:5px; padding:4px 0; }
+.artist-tag {
+  position:relative; padding:2px 8px; font-size:11px; border:1px solid var(--border); border-radius:14px;
+  cursor:pointer; transition:all 0.15s; user-select:none; font-family:var(--font); white-space:nowrap;
+  background:rgba(255,255,255,0.3);
+}
+[data-theme="dark"] .artist-tag { background:rgba(40,40,40,0.3); }
+.artist-tag:hover { border-color:#aaa; }
+.artist-tag.selected-lead { background:var(--accent); color:#fff; border-color:var(--accent); }
+.artist-tag.selected-support { background:var(--green); color:#fff; border-color:var(--green); }
+.artist-tag.selected-accent { background:var(--orange); color:#fff; border-color:var(--orange); }
+.artist-tag .dim-label { font-size:10px; color:var(--text3); margin-left:3px; }
+.artist-tag.selected-lead .dim-label,
+.artist-tag.selected-support .dim-label,
+.artist-tag.selected-accent .dim-label { color:rgba(255,255,255,0.7); }
+.artist-tag.compat-low { opacity:0.35; }
+
+/* Hover Tooltip */
+.tag-tooltip {
+  display:none; position:absolute; left:50%; bottom:100%; transform:translateX(-50%);
+  background:rgba(255,255,255,0.82); border:1px solid rgba(229,229,229,0.5); border-radius:8px;
+  padding:8px 10px; font-size:11px; white-space:nowrap; z-index:50;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08); pointer-events:none;
+  margin-bottom:6px; line-height:1.5;
+  backdrop-filter:blur(12px) saturate(1.3); -webkit-backdrop-filter:blur(12px) saturate(1.3);
+}
+[data-theme="dark"] .tag-tooltip { background:rgba(26,26,26,0.85); border-color:rgba(42,42,42,0.6); box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+.tag-tooltip::after {
+  content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+  border:5px solid transparent; border-top-color:rgba(255,255,255,0.82);
+}
+.artist-tag:hover .tag-tooltip { display:block; }
+.tag-tooltip-dims { color:var(--text2); }
+.tag-tooltip-dim { display:inline-block; padding:1px 5px; background:var(--accent-dim); border-radius:6px; color:var(--accent); font-size:10px; margin-right:3px; }
+.tag-tooltip-compat { margin-top:4px; font-size:10px; color:var(--text3); }
+.tag-tooltip-score { font-weight:700; font-family:'SF Mono',monospace; }
+
+/* Selection Legend */
+.legend { display:flex; gap:12px; margin-bottom:4px; font-size:11px; color:var(--text3); }
+.legend-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; vertical-align:middle; }
+
+/* Weight Presets */
+.preset-row { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+.preset-btn {
+  padding:3px 10px; font-size:11px; border:1px solid var(--border); border-radius:12px;
+  background:rgba(255,255,255,0.4); color:var(--text2); cursor:pointer; font-family:var(--font);
+  transition:all 0.15s;
+}
+[data-theme="dark"] .preset-btn { background:rgba(40,40,40,0.4); }
+.preset-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Role Filter */
+.role-filters { display:flex; gap:6px; margin-bottom:8px; }
+.role-btn {
+  padding:3px 10px; font-size:11px; border:1px solid var(--border); border-radius:12px;
+  background:rgba(255,255,255,0.4); color:var(--text2); cursor:pointer; font-family:var(--font);
+  transition:all 0.15s;
+}
+[data-theme="dark"] .role-btn { background:rgba(40,40,40,0.4); }
+.role-btn:hover { border-color:#aaa; }
+.role-btn.active { background:var(--text); color:#fff; border-color:var(--text); }
+
+/* Undo */
+.undo-btn {
+  padding:3px 10px; font-size:11px; border:1px dashed var(--border); border-radius:12px;
+  background:transparent; color:var(--text3); cursor:pointer; font-family:var(--font);
+  transition:all 0.15s;
+}
+.undo-btn:hover { border-color:var(--accent); color:var(--accent); }
+.undo-btn:disabled { opacity:0.3; cursor:default; }
+
+/* Weight Sliders */
+.weight-section { margin-top:16px; }
+.weight-row { display:flex; align-items:center; gap:4px 8px; margin-bottom:5px; padding:5px 10px; background:rgba(250,250,250,0.5); border-radius:8px; flex-wrap:wrap; }
+[data-theme="dark"] .weight-row { background:rgba(15,15,15,0.5); }
+.weight-role { font-size:11px; font-weight:600; width:36px; text-align:center; padding:2px 6px; border-radius:10px; color:#fff; flex-shrink:0; }
+.weight-role.lead { background:var(--accent); }
+.weight-role.support { background:var(--green); }
+.weight-role.acnt { background:var(--orange); }
+.weight-name { font-size:13px; font-weight:500; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.weight-slider { width:120px; min-width:80px; flex-shrink:1; accent-color:var(--text); cursor:pointer; }
+.weight-val { font-size:13px; font-weight:600; font-family:'SF Mono',monospace; width:32px; text-align:right; }
+.weight-remove { width:22px; height:22px; border:none; background:var(--red-dim); color:var(--red); border-radius:50%; cursor:pointer; font-size:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.weight-remove:hover { background:var(--red); color:#fff; }
+
+/* Output */
+.output-box {
+  background:rgba(26,26,26,0.88); color:#f0c040; padding:12px; border-radius:8px;
+  font-family:'SF Mono','JetBrains Mono',monospace; font-size:13px; line-height:1.6;
+  min-height:48px; word-break:break-all; position:relative; cursor:pointer;
+  text-shadow:0 0 8px rgba(240,192,64,0.15);
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+}
+.output-box:hover { background:rgba(34,34,34,0.92); }
+[data-theme="dark"] .output-box { background:rgba(17,17,17,0.88); border:1px solid rgba(42,42,42,0.6); }
+[data-theme="dark"] .output-box:hover { background:rgba(22,22,22,0.92); }
+[data-theme="dark"] .style-btn.active { background:#e5e5e5; color:#111; border-color:#e5e5e5; }
+[data-theme="dark"] .mode-tab.active { background:#e5e5e5; color:#111; }
+[data-theme="dark"] .feature-hint { background:linear-gradient(135deg, #1e293b, #0f172a); border-color:#334155; color:#93c5fd; }
+[data-theme="dark"] .feature-hint-text b { color:#bfdbfe; }
+[data-theme="dark"] .detail-card { box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+.detail-overlay.show .detail-card { transform:translateY(0) scale(1); }
+.output-desc {
+  font-size:12px; color:#4ade80; line-height:1.5; margin-bottom:8px;
+  font-family:var(--font); display:none;
+}
+.card-title .copy-hint {
+  font-size:11px; font-family:var(--font);
+  color:#fff; background:#dc2626; padding:3px 12px;
+  border-radius:10px; font-weight:600; letter-spacing:0.02em;
+}
+
+/* Generate Button */
+.gen-row { display:flex; gap:10px; margin-bottom:12px; align-items:center; }
+.btn {
+  padding:8px 20px; font-size:13px; font-weight:600; border:none; border-radius:8px;
+  cursor:pointer; font-family:var(--font); transition:all 0.15s;
+}
+.btn-primary { background:var(--accent); color:#fff; box-shadow:0 2px 8px rgba(37,99,235,0.25); }
+.btn-primary:hover { background:#1d4ed8; box-shadow:0 4px 12px rgba(37,99,235,0.3); transform:translateY(-1px); }
+.btn-secondary { background:rgba(255,255,255,0.4); color:var(--text); border:1px solid var(--border); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+[data-theme="dark"] .btn-secondary { background:rgba(40,40,40,0.4); }
+.btn-secondary:hover { border-color:#aaa; }
+.btn-small { padding:5px 12px; font-size:12px; }
+
+/* Mode tabs */
+.mode-tabs { display:flex; gap:0; margin-bottom:16px; border:1px solid rgba(229,229,229,0.5); border-radius:8px; overflow:hidden; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); }
+.mode-tab {
+  flex:1; padding:5px; font-size:13px; font-weight:500; text-align:center;
+  background:rgba(255,255,255,0.5); border:none; cursor:pointer; color:var(--text2);
+  font-family:var(--font); transition:all 0.15s; border-right:1px solid var(--border);
+}
+[data-theme="dark"] .mode-tab { background:rgba(30,30,30,0.5); }
+.mode-tab:last-child { border-right:none; }
+.mode-tab:hover { background:var(--bg); }
+.mode-tab.active { background:var(--text); color:#fff; }
+
+/* Compatibility info */
+.compat-info { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+.compat-badge { font-size:11px; padding:2px 8px; border-radius:10px; background:var(--accent-dim); color:var(--accent); font-weight:500; }
+
+/* Conflict panel: see new section above */
+
+/* Stats */
+.stats { display:flex; gap:16px; font-size:12px; color:var(--text3); margin-top:8px; }
+.stats b { color:var(--text2); }
+
+/* Artist Detail Modal */
+.detail-overlay {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0); z-index:100; align-items:center; justify-content:center;
+  display:flex; pointer-events:none; opacity:0; transition:background 0.25s, opacity 0.25s;
+  backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
+}
+.detail-overlay.show { pointer-events:auto; opacity:1; background:rgba(0,0,0,0.4); }
+.detail-card {
+  background:rgba(255,255,255,0.8); border-radius:12px; padding:24px; width:90%; max-width:440px;
+  max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.15);
+  position:relative; border:1px solid rgba(229,229,229,0.4);
+  backdrop-filter:blur(20px) saturate(1.5); -webkit-backdrop-filter:blur(20px) saturate(1.5);
+  transform:translateY(16px) scale(0.97); transition:transform 0.25s cubic-bezier(0.2,0.9,0.3,1);
+}
+[data-theme="dark"] .detail-card { background:rgba(26,26,26,0.85); border-color:rgba(60,60,60,0.4); }
+.detail-close {
+  position:absolute; top:12px; right:14px; font-size:18px; cursor:pointer;
+  color:var(--text3); width:28px; height:28px; display:flex; align-items:center;
+  justify-content:center; border-radius:6px;
+}
+.detail-close:hover { background:var(--bg); color:var(--text); }
+.detail-header { margin-bottom:16px; }
+.detail-name { font-size:18px; font-weight:700; margin-bottom:4px; }
+.detail-tag { font-size:12px; color:var(--text3); font-family:'SF Mono',monospace; margin-bottom:8px; }
+.detail-meta { display:flex; gap:6px; flex-wrap:wrap; }
+.detail-badge {
+  font-size:11px; padding:2px 8px; border-radius:10px; font-weight:500;
+}
+.detail-badge.style { background:var(--accent-dim); color:var(--accent); }
+.detail-badge.role { background:var(--green-dim); color:var(--green); }
+.detail-badge.strength-S { background:#fef9c3; color:#a16207; font-weight:700; }
+.detail-badge.strength-A { background:var(--accent-dim); color:var(--accent); }
+.detail-badge.strength-B { background:var(--bg); color:var(--text3); }
+.detail-section { margin-top:16px; }
+.detail-section-title { font-size:12px; font-weight:600; color:var(--text2); margin-bottom:8px; }
+.detail-vec-row {
+  display:flex; align-items:center; gap:6px; margin-bottom:4px; font-size:11px;
+}
+.detail-vec-label { min-width:50px; text-align:right; color:var(--text3); }
+.detail-vec-track { flex:1; height:8px; background:var(--bg); border-radius:4px; overflow:hidden; position:relative; }
+.detail-vec-fill { height:100%; border-radius:4px; transition:width 0.3s; }
+.detail-vec-val { min-width:28px; font-family:'SF Mono',monospace; font-size:10px; color:var(--text3); }
+.detail-compat-item {
+  display:flex; align-items:center; gap:8px; padding:6px 0;
+  border-bottom:1px solid var(--border); font-size:12px;
+}
+.detail-compat-item:last-child { border-bottom:none; }
+.detail-compat-name { flex:1; font-weight:500; }
+.detail-compat-score { font-family:'SF Mono',monospace; font-weight:600; min-width:36px; text-align:right; }
+.detail-compat-bar { width:60px; height:6px; background:var(--bg); border-radius:3px; overflow:hidden; }
+.detail-compat-fill { height:100%; border-radius:3px; }
+.detail-dims-summary { font-size:12px; color:var(--text2); line-height:1.6; }
+
+/* Scrollbar */
+.artist-pool::-webkit-scrollbar { width:4px; }
+.artist-pool::-webkit-scrollbar-track { background:transparent; }
+.artist-pool::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+/* Feature hint banner */
+.feature-hint {
+  display:flex; align-items:center; gap:8px; padding:8px 12px; margin-top:8px;
+  background:linear-gradient(135deg, rgba(239,246,255,0.7), rgba(240,253,244,0.7)); border:1px solid rgba(191,219,254,0.5);
+  border-radius:8px; font-size:12px; color:#1e40af; cursor:default;
+  animation: hintPulse 2s ease-in-out 1;
+  backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+}
+.feature-hint-icon {
+  width:22px; height:22px; border-radius:50%; background:#2563eb; color:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:12px;
+  font-weight:700; flex-shrink:0;
+}
+.feature-hint-text { flex:1; line-height:1.4; }
+.feature-hint-text b { color:#1e3a8a; }
+.feature-hint-close {
+  font-size:16px; color:#93c5fd; cursor:pointer; padding:0 4px;
+  border-radius:4px; flex-shrink:0;
+}
+.feature-hint-close:hover { color:#2563eb; background:#dbeafe; }
+@keyframes hintPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0); }
+  50% { box-shadow: 0 0 0 4px rgba(37,99,235,0.15); }
+}
+
+/* Empty state */
+.empty-hint { font-size:13px; color:var(--text3); text-align:center; padding:20px; }
+
+/* Favorites */
+.fav-list { max-height:200px; overflow-y:auto; }
+.fav-item {
+  display:flex; align-items:center; padding:8px 10px; font-size:12px;
+  font-family:'SF Mono',monospace; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background 0.1s; word-break:break-all; gap:8px;
+}
+.fav-item:hover { background:var(--accent-dim); }
+.fav-item:last-child { border-bottom:none; }
+.fav-item-text { flex:1; overflow:hidden; text-overflow:ellipsis; }
+.fav-item-name { font-size:11px; color:var(--accent); font-family:var(--font); font-weight:500; margin-bottom:2px; }
+.fav-item-str { color:var(--text2); }
+.fav-del { color:var(--text3); cursor:pointer; font-size:14px; padding:2px 4px; border-radius:4px; flex-shrink:0; }
+.fav-del:hover { color:var(--red); background:var(--red-dim); }
+.fav-empty { font-size:13px; color:var(--text3); text-align:center; padding:16px; }
+/* Dead CSS removed in v3.6: .fav-star, .fav-name-input */
+
+/* History */
+.history-list { max-height:200px; overflow-y:auto; }
+.history-item {
+  padding:8px 10px; font-size:12px; font-family:'SF Mono',monospace; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background 0.1s; word-break:break-all;
+}
+.history-item:hover { background:var(--accent-dim); }
+.history-item:last-child { border-bottom:none; }
+.history-empty { font-size:13px; color:var(--text3); text-align:center; padding:16px; }
+
+/* Search */
+.search-input {
+  width:100%; padding:8px 12px; font-size:14px; border:2px solid #002fa7;
+  border-radius:8px; outline:none; font-family:var(--font); margin-bottom:6px;
+  background:rgba(255,255,255,0.5); color:var(--text);
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+[data-theme="dark"] .search-input { background:rgba(30,30,30,0.5); }
+.search-input:focus { border-color:#002fa7; box-shadow:0 0 0 3px rgba(0,47,167,0.15); }
+
+/* Dead CSS removed in v3.6: .vec-display, .vec-bar*, .compat-meter* */
+
+/* Combo Compare */
+.compare-panel { display:none; }
+.compare-panel.show { display:block; }
+.compare-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.compare-slot {
+  background:rgba(250,250,250,0.4); border:1px solid var(--border); border-radius:8px;
+  padding:12px; min-height:120px;
+}
+.compare-slot-title { font-size:11px; font-weight:600; color:var(--text3); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.05em; }
+.compare-slot-str { font-size:11px; font-family:'SF Mono',monospace; color:var(--text2); word-break:break-all; margin-bottom:8px; }
+.compare-slot-score { font-size:20px; font-weight:700; margin-bottom:4px; }
+.compare-slot-label { font-size:11px; color:var(--text3); }
+.compare-slot-empty { font-size:12px; color:var(--text3); text-align:center; padding:20px; }
+.compare-vec-row { display:flex; align-items:center; gap:4px; margin-bottom:3px; font-size:10px; }
+.compare-vec-label { min-width:36px; text-align:right; color:var(--text3); }
+.compare-vec-track { flex:1; height:5px; background:var(--border); border-radius:2px; overflow:hidden; position:relative; }
+.compare-vec-fill-a { position:absolute; height:100%; border-radius:2px; opacity:0.7; }
+.compare-vec-fill-b { position:absolute; height:100%; border-radius:2px; opacity:0.7; }
+.compare-legend { display:flex; gap:16px; margin-top:8px; font-size:11px; color:var(--text3); }
+.compare-legend-dot { width:8px; height:8px; border-radius:2px; display:inline-block; margin-right:4px; vertical-align:middle; }
+
+/* Strength Filter */
+.strength-filters { display:flex; gap:6px; margin-bottom:8px; }
+.strength-btn {
+  padding:3px 10px; font-size:11px; border:1px solid var(--border); border-radius:12px;
+  background:rgba(255,255,255,0.4); color:var(--text2); cursor:pointer; font-family:var(--font);
+  transition:all 0.15s;
+}
+[data-theme="dark"] .strength-btn { background:rgba(40,40,40,0.4); }
+.strength-btn:hover { border-color:#aaa; }
+.strength-btn.active { background:var(--text); color:#fff; border-color:var(--text); }
+
+/* Conflict Panel (non-color: uses border style + text labels for severity) */
+.conflict-panel { margin-top:8px; display:none; }
+.conflict-panel.show { display:block; }
+.conflict-summary { font-size:12px; color:var(--text2); margin-bottom:6px; font-weight:600; }
+.conflict-pair-row {
+  display:flex; align-items:center; gap:8px; padding:5px 10px; margin:3px 0;
+  border-radius:0 6px 6px 0; font-size:11px; border-left:3px solid var(--border);
+  background:rgba(0,0,0,0.02);
+}
+[data-theme="dark"] .conflict-pair-row { background:rgba(255,255,255,0.02); }
+.conflict-pair-row.severe { border-left-width:4px; border-left-style:double; font-weight:600; }
+.conflict-pair-row.moderate { border-left-width:3px; border-left-style:solid; }
+.conflict-pair-row.mild { border-left-width:2px; border-left-style:dashed; }
+.conflict-pair-row.redundant { border-left-width:2px; border-left-style:dotted; }
+.conflict-label { font-size:10px; min-width:32px; flex-shrink:0; font-family:'SF Mono',monospace; opacity:0.7; }
+.conflict-names { white-space:nowrap; }
+.conflict-dims { display:flex; gap:3px; flex-wrap:wrap; flex:1; }
+.conflict-dim-tag {
+  padding:1px 5px; border:1px solid var(--border); border-radius:3px;
+  font-size:10px; font-family:'SF Mono',monospace;
+}
+.conflict-weight-warn {
+  font-size:11px; color:var(--text2); padding:4px 10px;
+  border-left:2px solid var(--border); margin-bottom:4px;
+}
+
+/* Import/Export */
+.io-btn {
+  padding:3px 10px; font-size:11px; border:1px solid var(--border); border-radius:12px;
+  background:rgba(255,255,255,0.4); color:var(--text2); cursor:pointer; font-family:var(--font);
+  transition:all 0.15s;
+}
+[data-theme="dark"] .io-btn { background:rgba(40,40,40,0.4); }
+.io-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Vector Help Modal */
+.vec-help-overlay {
+  position:fixed; top:0; left:0; width:100%; height:100%;
+  background:rgba(0,0,0,0); z-index:100; align-items:center; justify-content:center;
+  display:flex; pointer-events:none; opacity:0; transition:background 0.25s, opacity 0.25s;
+}
+.vec-help-overlay.show { pointer-events:auto; opacity:1; background:rgba(0,0,0,0.4); }
+.vec-help-card {
+  background:rgba(255,255,255,0.9); border-radius:12px; padding:24px; width:90%; max-width:520px;
+  max-height:85vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.15);
+  position:relative; border:1px solid rgba(229,229,229,0.4);
+  backdrop-filter:blur(20px) saturate(1.5); -webkit-backdrop-filter:blur(20px) saturate(1.5);
+  transform:translateY(16px) scale(0.97); transition:transform 0.25s cubic-bezier(0.2,0.9,0.3,1);
+}
+.vec-help-overlay.show .vec-help-card { transform:translateY(0) scale(1); }
+[data-theme="dark"] .vec-help-card { background:rgba(26,26,26,0.85); border-color:rgba(60,60,60,0.4); }
+.vec-help-close {
+  position:absolute; top:12px; right:14px; font-size:18px; cursor:pointer;
+  color:var(--text3); width:28px; height:28px; display:flex; align-items:center;
+  justify-content:center; border-radius:6px;
+}
+.vec-help-close:hover { background:var(--bg); color:var(--text); }
+.vec-help-title { font-size:16px; font-weight:700; margin-bottom:12px; }
+.vec-help-pair {
+  display:flex; align-items:center; gap:8px; padding:4px 0;
+  border-bottom:1px solid var(--border); font-size:12px;
+}
+.vec-help-pair:last-child { border-bottom:none; }
+.vec-help-dim { min-width:50px; font-weight:600; text-align:right; }
+.vec-help-vs { color:var(--text3); font-size:10px; }
+.vec-help-desc { flex:1; color:var(--text2); font-size:11px; }
+
+/* Search clear button */
+.search-wrap { position:relative; }
+.search-clear {
+  position:absolute; right:10px; top:50%; transform:translateY(-50%);
+  width:18px; height:18px; border:none; background:var(--border); color:var(--text3);
+  border-radius:50%; cursor:pointer; font-size:12px; display:none;
+  align-items:center; justify-content:center; font-family:var(--font); line-height:1;
+}
+.search-clear.visible { display:flex; }
+.search-clear:hover { background:var(--text3); color:#fff; }
+
+/* Role toggle */
+.weight-role { cursor:pointer; transition:all 0.15s; }
+.weight-role:hover { opacity:0.8; transform:scale(1.1); }
+
+/* Reorder buttons */
+.weight-move {
+  width:20px; height:20px; border:none; background:transparent; color:var(--text3);
+  cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center;
+  border-radius:4px; flex-shrink:0; padding:0; font-family:var(--font);
+}
+.weight-move:hover { background:var(--accent-dim); color:var(--accent); }
+.weight-move:disabled { opacity:0.2; cursor:default; }
+
+/* Recommendation explanation */
+.reco-explain {
+  font-size:11px; color:var(--text3); margin-top:6px; padding:6px 10px;
+  border-left:2px solid var(--border); line-height:1.6;
+}
+
+/* === v3.7.3: Exclude, Animations, Batch, Groups === */
+.artist-tag.excluded { opacity:0.25; text-decoration:line-through; }
+.artist-tag.excluded:hover { opacity:0.4; }
+@keyframes tagPop { 0%{transform:scale(1)} 50%{transform:scale(1.22)} 100%{transform:scale(1)} }
+@keyframes tagShrink { 0%{transform:scale(1)} 50%{transform:scale(0.82)} 100%{transform:scale(1)} }
+.artist-tag.anim-pop { animation:tagPop 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+.artist-tag.anim-shrink { animation:tagShrink 0.25s ease-out; }
+.artist-tag:hover { transform:translateY(-1px); }
+.artist-tag:active { transform:scale(0.94); }
+@keyframes outputPulse { 0%{box-shadow:inset 0 0 0 0 rgba(240,192,64,0)} 35%{box-shadow:inset 0 0 24px 0 rgba(240,192,64,0.18)} 100%{box-shadow:inset 0 0 0 0 rgba(240,192,64,0)} }
+.output-box.pulse { animation:outputPulse 0.55s ease-out; }
+.btn:active:not(:disabled) { transform:scale(0.95) !important; }
+.btn-primary:active:not(:disabled) { box-shadow:0 1px 4px rgba(37,99,235,0.15) !important; }
+.weight-slider:active { transform:scaleY(1.2); }
+.weight-role:active { transform:scale(0.85) !important; }
+/* batch-card: see v3.7.4 section below */
+.pool-group-header {
+  width:100%; font-size:10px; font-weight:600; color:var(--text3);
+  padding:8px 0 3px; letter-spacing:0.02em; opacity:0.7;
+}
+.pool-group-header:first-child { padding-top:2px; }
+.format-select {
+  font-size:11px; border:1px solid var(--border); border-radius:6px;
+  padding:1px 4px; background:transparent; color:var(--text3);
+  font-family:var(--font); cursor:pointer; outline:none;
+}
+.format-select:focus { border-color:var(--accent); }
+@keyframes cardSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+/* Compact style filter scroll */
+.style-filters { max-height:68px; overflow-y:auto; scrollbar-width:thin; scrollbar-color:var(--border) transparent; }
+.style-filters::-webkit-scrollbar { width:4px; }
+.style-filters::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+/* Artist pool scrollable container */
+.artist-pool-scroll {
+  max-height:32vh;
+  overflow-y:auto;
+  scrollbar-width:thin;
+  scrollbar-color:var(--border) transparent;
+}
+.artist-pool-scroll::-webkit-scrollbar { width:4px; }
+.artist-pool-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  body { padding:12px; }
+  .container { max-width:100%; }
+  h1 { font-size:17px; }
+  .subtitle { font-size:12px; }
+  .style-filters { gap:4px; }
+  .style-btn { padding:4px 10px; font-size:12px; }
+  .gen-row { flex-wrap:wrap; gap:6px; }
+  .btn { padding:7px 14px; font-size:12px; }
+  .btn-small { padding:5px 10px; font-size:11px; }
+  .weight-row { padding:6px 8px; flex-wrap:wrap; }
+  .weight-slider { width:80px; }
+  .weight-name { font-size:12px; }
+  .compare-grid { grid-template-columns:1fr; gap:10px; }
+  .batch-grid { grid-template-columns:1fr; }
+  .output-box { font-size:12px; padding:12px; }
+  .legend { gap:10px; font-size:11px; flex-wrap:wrap; }
+  .role-filters { flex-wrap:wrap; }
+  .card { padding:14px; }
+  .card-title { font-size:13px; }
+  .mode-tab { padding:6px; font-size:12px; }
+  .detail-card { width:95%; max-width:none; padding:16px; }
+  .fav-item { font-size:11px; }
+  .history-item { font-size:11px; }
+  /* .artist-pool scroll handled by .artist-pool-scroll */
+  .search-input { font-size:12px; padding:7px 10px; }
+  .strength-filters { gap:4px; }
+  .strength-btn { padding:3px 8px; font-size:10px; }
+  .conflict-pair-row { flex-wrap:wrap; gap:4px; padding:4px 8px; }
+  .conflict-dims { margin-top:2px; }
+  .weight-move { width:18px; height:18px; }
+  .reco-explain { font-size:10px; }
+}
+
+/* === v3.7.4: Similar, Strength, Drag, Redo, HoverPreview, CompactBatch === */
+.strength-indicator { display:inline-flex; align-items:center; gap:4px; font-size:11px; margin-left:8px; }
+.strength-indicator .si-label { padding:1px 6px; border-radius:8px; font-weight:600; font-size:10px; }
+.strength-indicator .si-label.strong { background:var(--green-dim); color:var(--green); }
+.strength-indicator .si-label.balanced { background:var(--accent-dim); color:var(--accent); }
+.strength-indicator .si-label.light { background:var(--orange-dim); color:var(--orange); }
+.strength-indicator .si-warn { font-size:10px; color:var(--orange); }
+
+.weight-row { transition:background 0.15s, opacity 0.15s; }
+.weight-row.dragging { opacity:0.4; background:var(--accent-dim); }
+.weight-row.drag-over { border-top:2px solid var(--accent); margin-top:-2px; }
+
+.redo-btn { padding:3px 10px; font-size:11px; border:1px solid var(--border); border-radius:12px; background:transparent; color:var(--text2); cursor:pointer; font-family:var(--font); transition:all 0.15s; margin-left:2px; }
+.redo-btn:hover:not(:disabled) { border-color:#aaa; }
+.redo-btn:disabled { opacity:0.3; cursor:default; }
+
+#miniPreview {
+  position:fixed; z-index:200; pointer-events:none;
+  background:rgba(255,255,255,0.92); border:1px solid rgba(229,229,229,0.6);
+  border-radius:10px; padding:10px 12px; width:200px;
+  box-shadow:0 8px 24px rgba(0,0,0,0.12); backdrop-filter:blur(16px) saturate(1.3);
+  font-size:11px; line-height:1.5; display:none;
+  transition:opacity 0.15s;
+}
+[data-theme="dark"] #miniPreview {
+  background:rgba(30,30,30,0.92); border-color:rgba(60,60,60,0.5);
+  box-shadow:0 8px 24px rgba(0,0,0,0.3);
+}
+#miniPreview .mp-name { font-weight:600; font-size:12px; margin-bottom:4px; }
+#miniPreview .mp-dims { display:flex; flex-direction:column; gap:2px; margin-bottom:6px; }
+#miniPreview .mp-dim-row { display:flex; align-items:center; gap:4px; }
+#miniPreview .mp-dim-label { width:32px; font-size:9px; color:var(--text3); text-align:right; flex-shrink:0; }
+#miniPreview .mp-dim-bar { flex:1; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+#miniPreview .mp-dim-fill { height:100%; border-radius:2px; }
+#miniPreview .mp-compat { font-size:10px; color:var(--text3); }
+#miniPreview .mp-similar { font-size:10px; color:var(--text3); margin-top:4px; }
+body.preview-active .tag-tooltip { display:none !important; }
+
+.batch-grid { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.batch-card { display:flex; align-items:center; gap:5px; padding:3px 8px; border:1px solid var(--border); border-radius:6px; cursor:pointer; transition:all 0.15s; background:transparent; font-size:11px; line-height:1.3; }
+.batch-card:hover { border-color:#aaa; }
+.batch-card.picked { border-color:var(--accent); background:var(--accent-dim); }
+.batch-card-no { font-size:9px; font-weight:600; color:var(--text3); white-space:nowrap; }
+.batch-card-artists { font-size:11px; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.batch-card-meta { display:flex; gap:6px; font-size:9px; color:var(--text3); white-space:nowrap; flex-shrink:0; }
+.batch-card-score { font-weight:600; }
+
+.detail-similar { margin-top:8px; }
+.detail-similar-title { font-size:11px; color:var(--text3); margin-bottom:4px; }
+.detail-similar-list { display:flex; flex-wrap:wrap; gap:4px; }
+.detail-similar-item { font-size:10px; padding:2px 8px; border:1px solid var(--border); border-radius:10px; cursor:pointer; transition:all 0.15s; }
+.detail-similar-item:hover { border-color:var(--accent); color:var(--accent); }
+.detail-similar-pct { font-size:9px; color:var(--text3); margin-left:2px; }
+</style>
+</head>
+<body>
+<div class="bg-layer"></div>
+<div id="miniPreview"></div>
+<canvas id="ribbonCanvas"></canvas>
+<div class="container">
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <h1>Illustrious 画师串生成器</h1>
+      <p class="subtitle">为 Illustrious / NoobAI 模型探索和生成画师组合 -- <span id="verLabel"></span> by <span class="author-name">差可拟</span></p>
+    </div>
+    <button id="themeToggle" onclick="toggleTheme()" style="
+      width:36px;height:36px;border-radius:50%;border:1px solid var(--border);
+      background:rgba(255,255,255,0.5);cursor:pointer;font-size:16px;display:flex;backdrop-filter:blur(8px);
+      align-items:center;justify-content:center;transition:all 0.2s;flex-shrink:0;
+    " title="切换明暗模式">&#9790;</button>
+  </div>
+
+  <!-- Mode -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="setMode('manual')">手动选择</button>
+    <button class="mode-tab" onclick="setMode('auto')">智能推荐</button>
+    <button class="mode-tab" onclick="setMode('random')">随机探索</button>
+  </div>
+
+
+  <!-- Manual mode actions -->
+  <div class="gen-row" id="manualActions" style="margin-bottom:16px">
+    <button class="btn btn-secondary btn-small" onclick="clearSelection()">清空选择</button>
+    <button class="btn btn-secondary btn-small" onclick="resetAll()" style="color:var(--red)">重置全部</button>
+  </div>
+
+  <!-- Auto mode panel -->
+  <div class="card" id="autoPanel" style="display:none">
+    <div class="card-title">智能推荐设置</div>
+    <div class="gen-row">
+      <span style="font-size:13px;color:var(--text2)">目标风格：</span>
+      <select id="autoStyle" style="flex:1;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font)">
+        <option value="">任意风格</option>
+      </select>
+    </div>
+    <div class="gen-row">
+      <span style="font-size:13px;color:var(--text2)">组合人数：</span>
+      <select id="autoCount" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font)">
+        <option value="2">2人组合</option>
+        <option value="3" selected>3人组合</option>
+        <option value="4">4人组合</option>
+      </select>
+      <button class="btn btn-primary" onclick="autoGenerate()">生成推荐</button>
+      <button class="btn btn-secondary btn-small" onclick="clearSelection()">清空选择</button>
+      <button class="btn btn-secondary btn-small" onclick="resetAll()" style="color:var(--red)">重置全部</button>
+    </div>
+  </div>
+
+  <div id="batchPreview" style="display:none"></div>
+
+  <!-- Random mode panel -->
+  <div class="card" id="randomPanel" style="display:none">
+    <div class="card-title">随机探索 <span>从画师池随机抽取组合</span></div>
+    <div class="gen-row">
+      <span style="font-size:13px;color:var(--text2)">组合人数：</span>
+      <select id="randomCount" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:var(--font)">
+        <option value="2">2人</option>
+        <option value="3" selected>3人</option>
+        <option value="4">4人</option>
+      </select>
+      <button class="btn btn-primary" onclick="randomGenerate()">随机生成</button>
+      <button class="btn btn-secondary btn-small" onclick="clearSelection()">清空选择</button>
+      <button class="btn btn-secondary btn-small" onclick="resetAll()" style="color:var(--red)">重置全部</button>
+    </div>
+  </div>
+
+  <!-- Output -->
+  <div class="card">
+    <div class="card-title">输出 <select id="outputFormat" class="format-select" onchange="renderOutput()" style="margin-left:6px"><option value="a1111">A1111</option><option value="comfyui">ComfyUI</option><option value="tags">纯标签</option></select> <span class="copy-hint" onclick="copyOutput()" style="margin-left:auto;cursor:pointer">点击复制</span></div>
+    <div class="output-box" id="outputBox" onclick="copyOutput()">
+      <div class="output-desc" id="outputDesc"></div>
+      <span id="outputText" style="color:#666;text-shadow:none">尚未选择画师</span>
+    </div>
+    <div class="compat-info" id="compatInfo"></div>
+    <div class="reco-explain" id="recoExplain" style="display:none"></div>
+    <div class="gen-row" style="margin-top:6px">
+      <button class="btn btn-secondary btn-small" onclick="saveToHistory()">保存到历史</button>
+      <button class="btn btn-secondary btn-small" onclick="promptFavorite()">收藏组合</button>
+      <button class="io-btn" onclick="exportComboJSON()">导出JSON</button>
+      <button class="io-btn" onclick="importComboJSON()">导入JSON</button>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:8px -16px;padding:0"></div>
+    <div class="card-title" style="margin-top:4px">权重调整 <span>拖动滑块调整，总权重建议 1.5-2.5</span> <span id="strengthIndicator" class="strength-indicator"></span><span style="margin-left:auto;font-size:13px">兼容度: <b id="comboScoreVal" style="font-size:15px">-</b></span></div>
+    <div class="preset-row" id="presetRow" style="display:none">
+      <button class="preset-btn" onclick="applyPreset('balanced')">均衡</button>
+      <button class="preset-btn" onclick="applyPreset('lead-heavy')">主导</button>
+      <button class="preset-btn" onclick="applyPreset('light')">轻混</button>
+      <button class="preset-btn" onclick="applyPreset('equal')">等权</button>
+    </div>
+    <div id="weightSection">
+      <div class="empty-hint">在下方画师池中点击添加到组合</div>
+    </div>
+    <div class="conflict-panel" id="conflictPanel"></div>
+  </div>
+
+  <!-- Filter -->
+  <div class="card">
+    <div class="card-title">风格筛选 <span>点击筛选画师池，可多选</span> <span style="margin-left:auto;font-size:11px;color:var(--text3);cursor:pointer;border:1px solid var(--border);border-radius:50%;width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center" onclick="showVecHelp()" title="向量维度说明">?</span></div>
+    <div class="style-filters" id="styleFilters"></div>
+    <div class="search-wrap">
+      <input class="search-input" id="searchInput" placeholder="搜索画师 (中文/英文/风格)" oninput="onSearchInput()">
+      <button class="search-clear" id="searchClear" onclick="clearSearch()">&times;</button>
+    </div>
+    <div class="legend">
+      <span><span class="legend-dot" style="background:var(--accent)"></span>主画师 (Lead)</span>
+      <span><span class="legend-dot" style="background:var(--green)"></span>辅助 (Support)</span>
+      <span><span class="legend-dot" style="background:var(--orange)"></span>点缀 (Accent)</span>
+    </div>
+    <div class="role-filters" id="roleFilters"></div>
+    <div class="strength-filters" id="strengthFilters"></div>
+    <div class="artist-pool-scroll">
+    <div class="artist-pool" id="artistPool"></div>
+    </div>
+    <div class="stats" id="poolStats"></div>
+    <div class="feature-hint" id="featureHint">
+      <span class="feature-hint-icon">?</span>
+      <span class="feature-hint-text"><b>右键点击</b>查看画师详情与向量图 | <b>Shift+点击</b>排除/恢复画师</span>
+      <span class="feature-hint-close" onclick="dismissHint()" title="关闭提示">&times;</span>
+    </div>
+  </div>
+
+
+  <!-- Favorites -->
+  <div class="card">
+    <div class="card-title">收藏夹 <span>收藏常用组合，长期保存</span>
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);font-weight:400;cursor:pointer" onclick="clearFavorites()">清空</span>
+    </div>
+    <div class="fav-list" id="favList">
+      <div class="fav-empty">暂无收藏的组合</div>
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="card">
+    <div class="card-title">历史记录 <span>点击恢复</span></div>
+    <div class="history-list" id="historyList">
+      <div class="history-empty">暂无保存的画师串</div>
+    </div>
+  </div>
+
+  <!-- Combo Compare -->
+  <div class="card compare-panel" id="comparePanel">
+    <div class="card-title">组合对比
+      <span style="margin-left:auto;font-size:12px;color:var(--text3);font-weight:400;cursor:pointer" onclick="clearCompare()">清空</span>
+    </div>
+    <div class="compare-grid">
+      <div class="compare-slot" id="compareSlotA">
+        <div class="compare-slot-title">组合 A</div>
+        <div class="compare-slot-empty">保存当前组合到此槽位</div>
+      </div>
+      <div class="compare-slot" id="compareSlotB">
+        <div class="compare-slot-title">组合 B</div>
+        <div class="compare-slot-empty">保存当前组合到此槽位</div>
+      </div>
+    </div>
+    <div id="compareVecChart" style="margin-top:12px"></div>
+    <div class="gen-row" style="margin-top:10px">
+      <button class="btn btn-secondary btn-small" onclick="saveToCompare('A')">当前 -> A</button>
+      <button class="btn btn-secondary btn-small" onclick="saveToCompare('B')">当前 -> B</button>
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="disclaimer-section">
+    <div class="disclaimer-title">免责声明与使用须知</div>
+    <ul class="disclaimer-list">
+      <li>本工具仅供 Stable Diffusion 创作辅助使用，生成的画师串为参考建议，实际效果取决于模型版本、采样器、CFG 等参数设置。</li>
+      <li>工具中收录的画师标签来源于公开的模型训练信息，不代表对任何画师作品的商业授权。使用生成图像时请遵守当地法律法规及平台规则。</li>
+      <li>画师语义向量为人工标注，存在主观偏差，兼容性评分仅供参考，不保证绝对准确。</li>
+      <li>本工具不收录任何 R18/NSFW 相关内容，仅限 SFW 场景使用。</li>
+      <li>本工具为开源免费项目，禁止用于任何商业售卖行为。使用即视为同意以上条款。</li>
+    </ul>
+  </div>
+
+  <!-- Footer -->
+  <div class="page-footer">
+    <span class="author-name">差可拟</span> · 2026.3.30 · <span id="verFooter"></span>
+  </div>
+</div>
+
+<script>
+// =============================================
+// Semantic Vector Model (EXP-008 methodology)
+// 20 dimensions, 10 conflict pairs
+// =============================================
+const VEC_DIMS = [
+  "sharp","soft",           // 0,1  line quality
+  "vivid","muted",          // 2,3  color saturation
+  "warm_tone","cool_tone",  // 4,5  color temperature
+  "dramatic","flat_light",  // 6,7  lighting
+  "detailed","simple",      // 8,9  detail level
+  "intense","gentle",       // 10,11 mood/energy
+  "realistic","stylized",   // 12,13 realism
+  "dark_tone","bright_tone",// 14,15 tone
+  "busy","minimal",         // 16,17 composition density
+  "textured","smooth"       // 18,19 surface quality
+];
+const VEC_DIM_COUNT = 20;
+
+const VEC_CONFLICTS = [
+  {a:"sharp",     b:"soft",        aIdx:0,  bIdx:1,  t:0.4, w:0.8},
+  {a:"vivid",     b:"muted",       aIdx:2,  bIdx:3,  t:0.4, w:0.7},
+  {a:"warm_tone", b:"cool_tone",   aIdx:4,  bIdx:5,  t:0.5, w:0.6},
+  {a:"dramatic",  b:"flat_light",  aIdx:6,  bIdx:7,  t:0.4, w:0.7},
+  {a:"detailed",  b:"simple",      aIdx:8,  bIdx:9,  t:0.5, w:0.5},
+  {a:"intense",   b:"gentle",      aIdx:10, bIdx:11, t:0.4, w:0.9},
+  {a:"realistic", b:"stylized",    aIdx:12, bIdx:13, t:0.5, w:0.8},
+  {a:"dark_tone", b:"bright_tone", aIdx:14, bIdx:15, t:0.4, w:0.7},
+  {a:"busy",      b:"minimal",     aIdx:16, bIdx:17, t:0.4, w:0.7},
+  {a:"textured",  b:"smooth",      aIdx:18, bIdx:19, t:0.4, w:0.6}
+];
+
+const VEC_DIM_LABELS = {
+  sharp:"锐利",soft:"柔和",vivid:"鲜艳",muted:"低饱和",
+  warm_tone:"暖色",cool_tone:"冷色",dramatic:"戏剧光",flat_light:"平光",
+  detailed:"高细节",simple:"简约",intense:"强烈",gentle:"温和",
+  realistic:"写实",stylized:"风格化",dark_tone:"暗调",bright_tone:"明亮",
+  busy:"繁密",minimal:"极简",textured:"质感",smooth:"光滑"
+};
+
+// Pre-computed 20-dim vectors for each artist
+// [sharp,soft, vivid,muted, warm,cool, dramatic,flat, detailed,simple, intense,gentle, realistic,stylized, dark,bright, busy,minimal, textured,smooth]
+const ARTIST_VECTORS = {
+  // -- 细腻精致 / 清新系 --
+  "ciloranko": [0.5,0.3, 0.3,0.5, 0.2,0.4, 0.4,0.1, 0.9,0.0, 0.0,0.8, 0.2,0.5, 0.0,0.6, 0.4,0.2, 0.1,0.8],
+  "anmi": [0.5,0.3, 0.2,0.6, 0.3,0.3, 0.1,0.5, 0.8,0.0, 0.0,0.8, 0.2,0.6, 0.0,0.5, 0.2,0.5, 0.1,0.8],
+  "ask \\(askzy\\)": [0.5,0.3, 0.3,0.4, 0.6,0.1, 0.3,0.2, 0.8,0.0, 0.0,0.8, 0.2,0.5, 0.0,0.6, 0.3,0.3, 0.2,0.7],
+  "sho \\(sho_lwlw\\)": [0.5,0.3, 0.2,0.6, 0.2,0.4, 0.3,0.2, 0.8,0.0, 0.0,0.7, 0.2,0.5, 0.1,0.4, 0.3,0.4, 0.1,0.8],
+  "shiratama \\(shiratamaco\\)": [0.1,0.7, 0.2,0.6, 0.5,0.1, 0.0,0.7, 0.3,0.4, 0.0,0.9, 0.0,0.8, 0.0,0.6, 0.1,0.7, 0.0,0.9],
+  "torino_aqua": [0.2,0.6, 0.2,0.6, 0.3,0.3, 0.2,0.3, 0.5,0.3, 0.0,0.7, 0.1,0.5, 0.0,0.5, 0.2,0.5, 0.5,0.3],
+  "amashiro_natsuki": [0.4,0.4, 0.2,0.6, 0.3,0.3, 0.3,0.2, 0.7,0.0, 0.0,0.7, 0.2,0.5, 0.0,0.5, 0.3,0.3, 0.1,0.7],
+  "momoko \\(momopoco\\)": [0.3,0.5, 0.3,0.4, 0.5,0.2, 0.2,0.4, 0.7,0.0, 0.0,0.8, 0.1,0.7, 0.0,0.6, 0.4,0.3, 0.1,0.8],
+  "noco \\(adamas\\)": [0.3,0.5, 0.3,0.4, 0.4,0.2, 0.1,0.5, 0.6,0.1, 0.0,0.7, 0.1,0.6, 0.0,0.5, 0.3,0.4, 0.1,0.7],
+  "morikura_en": [0.2,0.6, 0.3,0.4, 0.5,0.1, 0.3,0.2, 0.7,0.0, 0.0,0.7, 0.3,0.4, 0.0,0.5, 0.3,0.3, 0.2,0.6],
+  "kedama_milk": [0.3,0.5, 0.6,0.2, 0.4,0.3, 0.1,0.5, 0.5,0.2, 0.0,0.8, 0.1,0.7, 0.0,0.8, 0.4,0.3, 0.1,0.8],
+  "toosaka_asagi": [0.4,0.3, 0.4,0.3, 0.3,0.3, 0.3,0.3, 0.8,0.0, 0.1,0.6, 0.2,0.6, 0.0,0.5, 0.4,0.2, 0.1,0.8],
+  "mochizuki_kei": [0.4,0.4, 0.2,0.5, 0.3,0.3, 0.1,0.5, 0.5,0.3, 0.0,0.7, 0.1,0.5, 0.0,0.4, 0.2,0.4, 0.1,0.8],
+
+  // -- 华丽光影 / 唯美系 --
+  "rurudo": [0.2,0.6, 0.7,0.1, 0.4,0.3, 0.8,0.0, 0.8,0.0, 0.2,0.5, 0.2,0.5, 0.0,0.7, 0.5,0.2, 0.2,0.7],
+  "rella": [0.5,0.2, 0.8,0.0, 0.5,0.2, 0.8,0.0, 0.8,0.0, 0.5,0.2, 0.3,0.4, 0.0,0.7, 0.5,0.2, 0.2,0.7],
+  "hiten \\(hitenkei\\)": [0.5,0.3, 0.4,0.3, 0.4,0.3, 0.6,0.0, 0.9,0.0, 0.1,0.6, 0.6,0.2, 0.1,0.6, 0.3,0.4, 0.2,0.7],
+  "mika_pikazo": [0.3,0.3, 0.9,0.0, 0.5,0.2, 0.7,0.0, 0.8,0.0, 0.5,0.2, 0.1,0.7, 0.0,0.8, 0.7,0.1, 0.3,0.5],
+  "fuzichoco": [0.2,0.5, 0.5,0.2, 0.6,0.1, 0.7,0.0, 0.8,0.0, 0.2,0.6, 0.3,0.4, 0.0,0.6, 0.6,0.1, 0.3,0.5],
+  "tiv": [0.7,0.1, 0.7,0.1, 0.4,0.3, 0.7,0.0, 0.8,0.0, 0.5,0.2, 0.2,0.5, 0.0,0.7, 0.3,0.3, 0.1,0.8],
+  "mignon": [0.4,0.3, 0.5,0.2, 0.7,0.1, 0.4,0.1, 0.7,0.0, 0.1,0.6, 0.2,0.5, 0.0,0.6, 0.2,0.4, 0.2,0.6],
+  "kani_biimu": [0.3,0.4, 0.4,0.3, 0.6,0.1, 0.3,0.3, 0.7,0.1, 0.1,0.7, 0.2,0.6, 0.0,0.7, 0.3,0.3, 0.1,0.8],
+  "reoen": [0.5,0.2, 0.8,0.0, 0.3,0.4, 0.8,0.0, 0.8,0.0, 0.6,0.1, 0.3,0.4, 0.1,0.6, 0.3,0.3, 0.2,0.6],
+  "novelance": [0.2,0.5, 0.3,0.5, 0.3,0.3, 0.3,0.2, 0.5,0.3, 0.0,0.7, 0.1,0.6, 0.0,0.5, 0.3,0.3, 0.1,0.7],
+  "gin00": [0.4,0.3, 0.3,0.4, 0.5,0.2, 0.2,0.5, 0.5,0.2, 0.1,0.6, 0.4,0.3, 0.0,0.6, 0.1,0.7, 0.2,0.7],
+  "dsmile": [0.4,0.3, 0.6,0.2, 0.5,0.2, 0.3,0.3, 0.7,0.1, 0.1,0.6, 0.2,0.6, 0.0,0.7, 0.3,0.3, 0.1,0.8],
+  "ningen_mame": [0.4,0.2, 0.8,0.0, 0.4,0.3, 0.7,0.0, 0.8,0.0, 0.6,0.1, 0.2,0.5, 0.0,0.7, 0.2,0.5, 0.1,0.7],
+  "irodori_warabi": [0.2,0.5, 0.6,0.1, 0.6,0.1, 0.3,0.2, 0.5,0.2, 0.1,0.6, 0.1,0.5, 0.0,0.5, 0.3,0.3, 0.1,0.7],
+
+  // -- 锐利线条 / 力量感 --
+  "yoneyama_mai": [0.9,0.0, 0.8,0.0, 0.4,0.3, 0.8,0.0, 0.8,0.0, 0.8,0.0, 0.2,0.6, 0.0,0.6, 0.5,0.2, 0.3,0.5],
+  "miv4t": [0.8,0.0, 0.7,0.1, 0.3,0.4, 0.6,0.0, 0.8,0.0, 0.7,0.0, 0.3,0.4, 0.1,0.5, 0.5,0.2, 0.2,0.6],
+  "lack": [0.8,0.0, 0.4,0.3, 0.2,0.5, 0.8,0.0, 0.8,0.0, 0.5,0.2, 0.3,0.4, 0.5,0.1, 0.5,0.2, 0.2,0.6],
+  "as109": [0.7,0.1, 0.4,0.3, 0.2,0.5, 0.7,0.0, 0.7,0.0, 0.4,0.3, 0.3,0.4, 0.4,0.2, 0.4,0.2, 0.1,0.7],
+
+  // -- 概念艺术 / 厚涂系 --
+  "wlop": [0.2,0.6, 0.6,0.1, 0.4,0.3, 0.7,0.0, 0.8,0.0, 0.2,0.5, 0.5,0.3, 0.1,0.5, 0.5,0.2, 0.4,0.5],
+  "krenz_cushart": [0.5,0.2, 0.7,0.1, 0.5,0.2, 0.7,0.0, 0.8,0.0, 0.5,0.2, 0.4,0.4, 0.0,0.6, 0.5,0.2, 0.4,0.4],
+  "ilya_kuvshinov": [0.4,0.3, 0.3,0.5, 0.3,0.3, 0.5,0.1, 0.5,0.3, 0.1,0.6, 0.4,0.4, 0.1,0.5, 0.2,0.5, 0.2,0.7],
+  "atdan": [0.7,0.1, 0.7,0.1, 0.4,0.3, 0.8,0.0, 0.8,0.0, 0.6,0.1, 0.3,0.5, 0.1,0.6, 0.5,0.2, 0.2,0.6],
+  "kawacy": [0.2,0.5, 0.6,0.1, 0.4,0.3, 0.6,0.0, 0.7,0.0, 0.2,0.5, 0.4,0.4, 0.1,0.5, 0.4,0.3, 0.5,0.3],
+  "dishwasher1910": [0.5,0.2, 0.6,0.1, 0.4,0.3, 0.7,0.0, 0.7,0.0, 0.5,0.2, 0.4,0.4, 0.1,0.5, 0.6,0.1, 0.2,0.6],
+  "fkey": [0.5,0.2, 0.3,0.4, 0.3,0.4, 0.3,0.3, 0.9,0.0, 0.2,0.4, 0.3,0.5, 0.1,0.4, 0.6,0.1, 0.2,0.6],
+  "demizu_posuka": [0.4,0.2, 0.8,0.0, 0.5,0.2, 0.6,0.0, 0.7,0.0, 0.5,0.2, 0.1,0.7, 0.0,0.7, 0.7,0.1, 0.4,0.3],
+
+  // -- 萌系 / 可爱系 --
+  "toridamono": [0.3,0.4, 0.5,0.2, 0.5,0.2, 0.2,0.4, 0.7,0.1, 0.1,0.6, 0.1,0.7, 0.0,0.6, 0.5,0.2, 0.2,0.6],
+  "soraneko_hino": [0.4,0.4, 0.3,0.4, 0.5,0.1, 0.1,0.5, 0.5,0.2, 0.0,0.8, 0.2,0.6, 0.0,0.5, 0.3,0.4, 0.3,0.5],
+  "poco \\(asahi_age\\)": [0.4,0.3, 0.5,0.2, 0.3,0.3, 0.1,0.5, 0.7,0.1, 0.1,0.6, 0.1,0.7, 0.0,0.7, 0.4,0.3, 0.1,0.8],
+  "scottie \\(phantom2\\)": [0.4,0.3, 0.5,0.2, 0.4,0.2, 0.1,0.5, 0.5,0.2, 0.1,0.7, 0.2,0.6, 0.0,0.5, 0.5,0.2, 0.3,0.5],
+  "kazutake_hazano": [0.2,0.6, 0.2,0.5, 0.3,0.2, 0.1,0.6, 0.4,0.3, 0.0,0.9, 0.1,0.6, 0.0,0.4, 0.5,0.2, 0.3,0.5],
+  "matanonki": [0.4,0.4, 0.2,0.5, 0.3,0.3, 0.1,0.5, 0.5,0.3, 0.0,0.8, 0.1,0.6, 0.0,0.4, 0.3,0.3, 0.2,0.6],
+
+  // -- 写实向 --
+  "nardack": [0.4,0.3, 0.2,0.6, 0.3,0.4, 0.5,0.1, 0.8,0.0, 0.1,0.6, 0.5,0.3, 0.1,0.5, 0.2,0.5, 0.1,0.8],
+  "loundraw": [0.2,0.5, 0.4,0.3, 0.3,0.4, 0.6,0.0, 0.6,0.1, 0.2,0.5, 0.4,0.4, 0.2,0.4, 0.2,0.5, 0.3,0.5],
+  "homare": [0.5,0.2, 0.5,0.2, 0.3,0.4, 0.6,0.1, 0.8,0.0, 0.4,0.3, 0.4,0.3, 0.2,0.4, 0.4,0.2, 0.2,0.6],
+  "vofan": [0.5,0.2, 0.3,0.4, 0.2,0.5, 0.5,0.1, 0.7,0.0, 0.2,0.4, 0.6,0.2, 0.4,0.2, 0.4,0.3, 0.3,0.5],
+
+  // -- 文艺沉稳 --
+  "murata_range": [0.5,0.3, 0.2,0.7, 0.3,0.4, 0.5,0.1, 0.8,0.0, 0.0,0.7, 0.5,0.3, 0.4,0.2, 0.7,0.1, 0.3,0.5],
+  "kappe": [0.2,0.5, 0.2,0.7, 0.3,0.4, 0.1,0.5, 0.5,0.3, 0.0,0.7, 0.3,0.4, 0.3,0.3, 0.4,0.2, 0.2,0.6],
+  "abara_heiki": [0.7,0.1, 0.3,0.5, 0.1,0.6, 0.7,0.0, 0.7,0.0, 0.4,0.3, 0.3,0.4, 0.6,0.1, 0.4,0.3, 0.3,0.5],
+  "huke": [0.8,0.0, 0.3,0.4, 0.1,0.6, 0.7,0.0, 0.8,0.0, 0.4,0.3, 0.3,0.4, 0.7,0.0, 0.6,0.1, 0.3,0.5],
+  "so-bin": [0.6,0.1, 0.4,0.3, 0.2,0.5, 0.7,0.0, 0.8,0.0, 0.4,0.3, 0.3,0.5, 0.6,0.1, 0.6,0.1, 0.4,0.4],
+
+  // -- 韩系 --
+  "modare": [0.6,0.2, 0.6,0.2, 0.5,0.2, 0.4,0.2, 0.8,0.0, 0.3,0.4, 0.3,0.5, 0.1,0.6, 0.4,0.3, 0.2,0.7],
+  "betabeet": [0.4,0.3, 0.2,0.5, 0.3,0.3, 0.3,0.2, 0.5,0.3, 0.0,0.7, 0.3,0.4, 0.0,0.5, 0.3,0.3, 0.2,0.6],
+  "deadnooodles": [0.7,0.1, 0.7,0.1, 0.4,0.3, 0.1,0.6, 0.6,0.1, 0.0,0.8, 0.1,0.7, 0.0,0.8, 0.5,0.2, 0.0,0.9],
+  "kanda_done": [0.7,0.1, 0.6,0.1, 0.4,0.3, 0.6,0.0, 0.7,0.0, 0.4,0.3, 0.4,0.3, 0.1,0.5, 0.3,0.4, 0.2,0.7],
+  "jima": [0.4,0.4, 0.2,0.6, 0.2,0.5, 0.4,0.2, 0.7,0.0, 0.0,0.8, 0.3,0.5, 0.1,0.5, 0.2,0.5, 0.1,0.8],
+
+  // -- 暗色调 / 幻想 --
+  "ayami_kojima": [0.5,0.2, 0.5,0.2, 0.4,0.3, 0.7,0.0, 0.8,0.0, 0.3,0.3, 0.3,0.5, 0.5,0.2, 0.7,0.1, 0.6,0.2],
+  "alphonse_mucha": [0.4,0.3, 0.5,0.2, 0.5,0.2, 0.4,0.1, 0.9,0.0, 0.1,0.5, 0.2,0.6, 0.2,0.4, 0.8,0.0, 0.5,0.2],
+
+  // -- 治愈日常 --
+  "horiguchi_yukiko": [0.2,0.6, 0.3,0.4, 0.6,0.1, 0.1,0.6, 0.4,0.3, 0.0,0.8, 0.1,0.7, 0.0,0.6, 0.1,0.6, 0.0,0.9],
+  "nishiya_futoshi": [0.2,0.5, 0.3,0.5, 0.4,0.3, 0.3,0.3, 0.5,0.2, 0.2,0.6, 0.3,0.5, 0.1,0.4, 0.3,0.3, 0.3,0.5],
+  "itomugi-kun": [0.3,0.4, 0.3,0.4, 0.4,0.2, 0.2,0.4, 0.5,0.2, 0.1,0.6, 0.2,0.5, 0.0,0.5, 0.2,0.5, 0.2,0.6],
+  "gweda": [0.3,0.4, 0.3,0.4, 0.5,0.2, 0.4,0.2, 0.6,0.1, 0.1,0.6, 0.3,0.4, 0.1,0.5, 0.4,0.2, 0.3,0.5],
+  "haneru": [0.3,0.5, 0.2,0.6, 0.4,0.2, 0.1,0.5, 0.5,0.2, 0.0,0.7, 0.2,0.5, 0.0,0.5, 0.2,0.5, 0.2,0.6],
+
+  // -- 其他高评价 --
+  "omone_hokoma_agm": [0.6,0.1, 0.5,0.2, 0.5,0.2, 0.7,0.0, 0.9,0.0, 0.7,0.0, 0.8,0.1, 0.3,0.2, 0.5,0.1, 0.3,0.5],
+  "freng": [0.5,0.2, 0.6,0.1, 0.5,0.2, 0.3,0.3, 0.7,0.1, 0.3,0.4, 0.2,0.6, 0.0,0.7, 0.3,0.3, 0.2,0.7],
+  "kasuga_haruhi": [0.3,0.4, 0.4,0.3, 0.4,0.2, 0.2,0.4, 0.6,0.1, 0.0,0.8, 0.1,0.7, 0.0,0.7, 0.3,0.3, 0.1,0.8],
+  "tyakomes": [0.3,0.4, 0.5,0.3, 0.5,0.2, 0.1,0.5, 0.5,0.2, 0.1,0.6, 0.1,0.7, 0.0,0.6, 0.3,0.4, 0.1,0.8],
+  "konya_karasue": [0.2,0.5, 0.5,0.3, 0.2,0.6, 0.5,0.1, 0.6,0.2, 0.2,0.5, 0.1,0.6, 0.1,0.5, 0.3,0.4, 0.2,0.7],
+  "ebifurya": [0.3,0.4, 0.3,0.5, 0.5,0.2, 0.1,0.6, 0.5,0.2, 0.0,0.7, 0.3,0.4, 0.0,0.6, 0.2,0.6, 0.1,0.8],
+  "wanke": [0.5,0.2, 0.4,0.3, 0.3,0.4, 0.5,0.2, 0.8,0.0, 0.2,0.5, 0.4,0.4, 0.3,0.3, 0.5,0.2, 0.2,0.7],
+  "quasarcake": [0.4,0.3, 0.3,0.5, 0.2,0.5, 0.4,0.2, 0.7,0.1, 0.1,0.6, 0.3,0.5, 0.2,0.4, 0.4,0.3, 0.3,0.6],
+  "azuuru": [0.4,0.3, 0.4,0.3, 0.3,0.4, 0.2,0.4, 0.7,0.1, 0.1,0.7, 0.2,0.6, 0.0,0.6, 0.2,0.5, 0.1,0.8],
+  "zuizi": [0.3,0.4, 0.3,0.5, 0.4,0.2, 0.2,0.4, 0.4,0.3, 0.4,0.4, 0.1,0.7, 0.2,0.4, 0.3,0.4, 0.3,0.5],
+  "weri": [0.3,0.5, 0.5,0.3, 0.5,0.2, 0.3,0.3, 0.6,0.1, 0.0,0.8, 0.2,0.6, 0.0,0.7, 0.2,0.5, 0.1,0.8],
+  "mamimi": [0.4,0.3, 0.6,0.1, 0.5,0.2, 0.5,0.1, 0.5,0.2, 0.2,0.5, 0.2,0.5, 0.0,0.6, 0.3,0.3, 0.2,0.6],
+  "zheng": [0.5,0.2, 0.6,0.2, 0.6,0.1, 0.5,0.2, 0.6,0.1, 0.5,0.2, 0.4,0.4, 0.1,0.6, 0.4,0.3, 0.3,0.5],
+  "makoto_shinkai": [0.2,0.5, 0.7,0.1, 0.4,0.3, 0.7,0.0, 0.8,0.0, 0.1,0.5, 0.4,0.3, 0.0,0.7, 0.5,0.2, 0.3,0.5],
+  "soejima_shigenori": [0.8,0.0, 0.6,0.1, 0.3,0.4, 0.6,0.0, 0.7,0.0, 0.5,0.2, 0.2,0.6, 0.1,0.5, 0.4,0.3, 0.2,0.6],
+
+  // -- 新增: 锐利线条补充 --
+  "takeuchi_takashi": [0.8,0.0, 0.3,0.4, 0.2,0.5, 0.6,0.0, 0.8,0.0, 0.5,0.2, 0.3,0.5, 0.1,0.5, 0.3,0.3, 0.1,0.7],
+  "shimada_fumikane": [0.7,0.1, 0.3,0.4, 0.2,0.4, 0.3,0.2, 0.7,0.0, 0.3,0.4, 0.2,0.6, 0.1,0.5, 0.5,0.2, 0.2,0.6],
+  "houtengeki": [0.5,0.2, 0.7,0.1, 0.5,0.2, 0.5,0.1, 0.8,0.0, 0.2,0.5, 0.1,0.7, 0.0,0.7, 0.5,0.2, 0.2,0.6],
+  "yaegashi_nan": [0.7,0.1, 0.7,0.1, 0.4,0.3, 0.5,0.1, 0.8,0.0, 0.5,0.2, 0.2,0.6, 0.0,0.6, 0.2,0.4, 0.1,0.8],
+
+  // -- 新增：写实向补充 --
+  "minaba_hideo": [0.5,0.2, 0.6,0.1, 0.4,0.2, 0.5,0.1, 0.9,0.0, 0.3,0.3, 0.4,0.4, 0.1,0.5, 0.6,0.1, 0.2,0.6],
+
+  // -- 新增：精致商业补充 --
+  "tsunako": [0.5,0.2, 0.7,0.1, 0.4,0.3, 0.3,0.2, 0.7,0.0, 0.2,0.5, 0.1,0.7, 0.0,0.7, 0.3,0.4, 0.1,0.8],
+  "tomose_shunsaku": [0.5,0.3, 0.3,0.4, 0.4,0.2, 0.2,0.3, 0.8,0.0, 0.1,0.6, 0.3,0.5, 0.0,0.5, 0.3,0.3, 0.1,0.8],
+  "ito_noizi": [0.4,0.3, 0.3,0.4, 0.5,0.2, 0.2,0.4, 0.6,0.1, 0.0,0.7, 0.2,0.6, 0.0,0.5, 0.2,0.4, 0.1,0.7],
+  "fujima_takuya": [0.3,0.4, 0.4,0.3, 0.5,0.1, 0.3,0.3, 0.7,0.1, 0.0,0.7, 0.2,0.6, 0.0,0.6, 0.3,0.3, 0.2,0.7],
+
+  // -- 新增：独特风格补充 --
+  "avogado6": [0.3,0.4, 0.2,0.7, 0.2,0.5, 0.5,0.1, 0.3,0.5, 0.3,0.4, 0.2,0.6, 0.6,0.1, 0.1,0.7, 0.2,0.5],
+  "dairi": [0.6,0.1, 0.5,0.2, 0.3,0.3, 0.1,0.6, 0.8,0.0, 0.1,0.5, 0.1,0.7, 0.0,0.6, 0.3,0.3, 0.2,0.6],
+  "sofra": [0.2,0.5, 0.3,0.4, 0.4,0.3, 0.2,0.4, 0.5,0.2, 0.0,0.7, 0.2,0.5, 0.0,0.5, 0.2,0.5, 0.3,0.5],
+  "sumiyao \\(amam\\)": [0.4,0.3, 0.8,0.0, 0.4,0.3, 0.5,0.1, 0.6,0.1, 0.4,0.3, 0.1,0.7, 0.0,0.8, 0.4,0.3, 0.2,0.6],
+
+  // -- 新增：氛围/背景补充 --
+  "mauve": [0.2,0.6, 0.4,0.3, 0.3,0.4, 0.1,0.5, 0.6,0.1, 0.0,0.8, 0.1,0.7, 0.0,0.7, 0.5,0.2, 0.1,0.8],
+
+  // -- 新增：萌系/SFW补充 --
+  "naga_u": [0.2,0.6, 0.4,0.3, 0.4,0.2, 0.0,0.7, 0.2,0.5, 0.0,0.8, 0.0,0.9, 0.0,0.7, 0.1,0.7, 0.0,0.9],
+  "crote": [0.5,0.2, 0.3,0.4, 0.3,0.3, 0.1,0.5, 0.7,0.0, 0.1,0.6, 0.1,0.6, 0.0,0.5, 0.2,0.4, 0.1,0.7],
+  "onikobe_rin": [0.3,0.4, 0.2,0.5, 0.4,0.2, 0.2,0.4, 0.4,0.3, 0.1,0.6, 0.1,0.6, 0.1,0.4, 0.3,0.4, 0.5,0.3],
+  "nekotoufu": [0.3,0.5, 0.4,0.3, 0.5,0.1, 0.1,0.5, 0.3,0.4, 0.2,0.6, 0.1,0.7, 0.0,0.6, 0.2,0.5, 0.2,0.6],
+  "yamamoto_souichirou": [0.3,0.5, 0.2,0.5, 0.5,0.2, 0.1,0.6, 0.3,0.4, 0.0,0.8, 0.1,0.7, 0.0,0.5, 0.3,0.3, 0.1,0.7],
+
+  // -- 新增：S级画师补充 --
+  "redjuice": [0.6,0.1, 0.4,0.3, 0.2,0.5, 0.7,0.0, 0.8,0.0, 0.3,0.4, 0.6,0.2, 0.2,0.4, 0.6,0.1, 0.3,0.5],
+  "rin_yuu": [0.2,0.6, 0.3,0.5, 0.5,0.1, 0.1,0.5, 0.7,0.0, 0.0,0.8, 0.1,0.7, 0.0,0.6, 0.2,0.5, 0.1,0.8],
+  "hammer \\(sunset_beach\\)": [0.3,0.5, 0.5,0.2, 0.6,0.1, 0.2,0.3, 0.6,0.1, 0.0,0.8, 0.1,0.6, 0.0,0.6, 0.3,0.3, 0.3,0.5],
+  "haruyama_kazunori": [0.3,0.4, 0.4,0.3, 0.5,0.2, 0.5,0.1, 0.8,0.0, 0.0,0.7, 0.4,0.4, 0.0,0.5, 0.3,0.3, 0.3,0.5],
+
+  // -- 新増：薄弱风格补充 (watercolor/ink/cyber/simple) --
+  "atelier_bono": [0.3,0.4, 0.3,0.4, 0.4,0.2, 0.2,0.4, 0.5,0.2, 0.2,0.5, 0.4,0.3, 0.1,0.5, 0.4,0.2, 0.7,0.1],
+  "peach_momoko": [0.2,0.6, 0.4,0.3, 0.5,0.2, 0.3,0.3, 0.5,0.2, 0.3,0.5, 0.3,0.5, 0.0,0.6, 0.3,0.3, 0.6,0.2],
+  "aoi_ogata": [0.5,0.2, 0.1,0.7, 0.1,0.5, 0.3,0.4, 0.4,0.4, 0.4,0.3, 0.4,0.3, 0.4,0.1, 0.1,0.7, 0.2,0.6],
+  "yuzuha \\(yuzutime\\)": [0.3,0.5, 0.1,0.6, 0.3,0.3, 0.3,0.3, 0.3,0.4, 0.2,0.6, 0.2,0.5, 0.3,0.3, 0.2,0.4, 0.7,0.1],
+  "sukabu": [0.7,0.1, 0.4,0.2, 0.2,0.5, 0.5,0.1, 0.8,0.0, 0.5,0.2, 0.4,0.3, 0.2,0.3, 0.7,0.0, 0.2,0.6],
+  "mocha \\(cotton\\)": [0.2,0.5, 0.2,0.4, 0.4,0.3, 0.2,0.4, 0.3,0.5, 0.1,0.7, 0.3,0.4, 0.0,0.5, 0.2,0.6, 0.3,0.5]
+};
+
+// =============================================
+// Artist Database
+// =============================================
+const ARTISTS = [
+  // -- 细腻精致 / 清新系 --
+  {tag:"ciloranko", name:"ciloranko", styles:["refined","pastel"], roles:["lead","support"], strength:"S"},
+  {tag:"anmi", name:"anmi", styles:["refined","cute"], roles:["lead","support","accent"], strength:"S"},
+  {tag:"ask \\(askzy\\)", name:"ask(askzy)", styles:["refined","pastel"], roles:["lead","support"], strength:"S"},
+  {tag:"sho \\(sho_lwlw\\)", name:"sho(sho_lwlw)", styles:["refined","ink"], roles:["lead","support","accent"], strength:"A"},
+  {tag:"shiratama \\(shiratamaco\\)", name:"shiratama", styles:["refined","cute"], roles:["support","accent"], strength:"A"},
+  {tag:"torino_aqua", name:"torino aqua", styles:["refined","watercolor"], roles:["support","accent"], strength:"A"},
+  {tag:"amashiro_natsuki", name:"amashiro natsuki", styles:["refined","pastel"], roles:["support"], strength:"A"},
+  {tag:"momoko \\(momopoco\\)", name:"momoko", styles:["decorative","romantic","pastel"], roles:["support","accent"], strength:"B"},
+  {tag:"noco \\(adamas\\)", name:"noco", styles:["refined","pastel"], roles:["accent"], strength:"B"},
+  {tag:"morikura_en", name:"morikura en", styles:["refined","atmospheric"], roles:["accent"], strength:"B"},
+  {tag:"kedama_milk", name:"kedama milk", styles:["kawaii","vivid","decorative"], roles:["support","accent"], strength:"A"},
+  {tag:"toosaka_asagi", name:"toosaka asagi", styles:["elegant","hair","atmospheric"], roles:["support","accent"], strength:"B"},
+  {tag:"mochizuki_kei", name:"mochizuki kei", styles:["refined","pastel"], roles:["accent"], strength:"B"},
+
+  // -- 华丽光影 / 唯美系 --
+  {tag:"rurudo", name:"rurudo", styles:["gorgeous","dreamy"], roles:["lead"], strength:"S"},
+  {tag:"rella", name:"rella", styles:["gorgeous","vivid"], roles:["lead","support"], strength:"S"},
+  {tag:"hiten \\(hitenkei\\)", name:"hiten", styles:["gorgeous","realistic"], roles:["lead","support"], strength:"S"},
+  {tag:"mika_pikazo", name:"mika pikazo", styles:["gorgeous","cute","vivid"], roles:["lead"], strength:"A"},
+  {tag:"fuzichoco", name:"fuzichoco", styles:["gorgeous","thick_paint"], roles:["lead","support"], strength:"A"},
+  {tag:"tiv", name:"tiv", styles:["gorgeous","sharp"], roles:["lead","support"], strength:"A"},
+  {tag:"mignon", name:"mignon", styles:["gorgeous","warm"], roles:["support"], strength:"A"},
+  {tag:"kani_biimu", name:"kani biimu", styles:["warm","intimate","yuri"], roles:["support"], strength:"A"},
+  {tag:"reoen", name:"reoen", styles:["gorgeous","cyber"], roles:["lead","support"], strength:"A"},
+  {tag:"novelance", name:"novelance", styles:["gorgeous","dreamy"], roles:["support","accent"], strength:"B"},
+  {tag:"gin00", name:"gin00", styles:["minimal","glossy","figure"], roles:["support"], strength:"B"},
+  {tag:"dsmile", name:"dsmile", styles:["glossy","vivid","commercial"], roles:["support"], strength:"A"},
+  {tag:"ningen_mame", name:"ningen mame", styles:["gorgeous","dynamic"], roles:["lead","support"], strength:"A"},
+  {tag:"irodori_warabi", name:"irodori warabi", styles:["gorgeous","warm"], roles:["accent"], strength:"B"},
+
+  // -- 锐利线条 / 力量感 --
+  {tag:"yoneyama_mai", name:"yoneyama mai", styles:["sharp","dynamic"], roles:["lead"], strength:"S"},
+  {tag:"miv4t", name:"miv4t", styles:["sharp","dynamic"], roles:["lead","support"], strength:"A"},
+  {tag:"lack", name:"lack", styles:["sharp","dark"], roles:["lead","support","accent"], strength:"A"},
+  {tag:"as109", name:"as109", styles:["sharp","dark"], roles:["support","accent"], strength:"B"},
+
+  // -- 概念艺术 / 厚涂系 --
+  {tag:"wlop", name:"wlop", styles:["concept","thick_paint"], roles:["lead","accent"], strength:"S"},
+  {tag:"krenz_cushart", name:"krenz cushart", styles:["concept","thick_paint"], roles:["lead","support"], strength:"A"},
+  {tag:"ilya_kuvshinov", name:"ilya kuvshinov", styles:["concept","simple"], roles:["lead"], strength:"A"},
+  {tag:"atdan", name:"atdan", styles:["concept","sharp"], roles:["lead","support"], strength:"A"},
+  {tag:"kawacy", name:"kawacy", styles:["concept","atmospheric"], roles:["support"], strength:"B"},
+  {tag:"dishwasher1910", name:"dishwasher1910", styles:["concept","dynamic"], roles:["lead","support"], strength:"A"},
+  {tag:"fkey", name:"fkey", styles:["detailed","costume","cool"], roles:["support"], strength:"B"},
+  {tag:"demizu_posuka", name:"demizu posuka", styles:["concept","unique"], roles:["lead"], strength:"B"},
+
+  // -- 萌系 / 可爱系 --
+  {tag:"toridamono", name:"toridamono", styles:["fantasy","vivid","detailed"], roles:["support","accent"], strength:"B"},
+  {tag:"soraneko_hino", name:"soraneko hino", styles:["cute","refined"], roles:["support"], strength:"B"},
+  {tag:"poco \\(asahi_age\\)", name:"poco", styles:["mecha","cute","technical"], roles:["accent"], strength:"B"},
+  {tag:"scottie \\(phantom2\\)", name:"scottie", styles:["cute","refined"], roles:["support"], strength:"B"},
+  {tag:"kazutake_hazano", name:"kazutake hazano", styles:["cute","soft"], roles:["accent"], strength:"B"},
+  {tag:"matanonki", name:"matanonki", styles:["cute","refined"], roles:["accent"], strength:"B"},
+
+  // -- 写实向 --
+  {tag:"nardack", name:"nardack", styles:["realistic","dreamy"], roles:["lead","support"], strength:"A"},
+  {tag:"loundraw", name:"loundraw", styles:["realistic","atmospheric"], roles:["support","accent"], strength:"A"},
+  {tag:"homare", name:"homare", styles:["glamour","dramatic","bold"], roles:["support"], strength:"B"},
+  {tag:"vofan", name:"vofan", styles:["realistic","unique"], roles:["lead"], strength:"B"},
+
+  // -- 文艺沉稳 --
+  {tag:"murata_range", name:"murata range", styles:["literary","muted"], roles:["lead"], strength:"A"},
+  {tag:"kappe", name:"kappe", styles:["literary","muted"], roles:["support","accent"], strength:"B"},
+  {tag:"abara_heiki", name:"abara heiki", styles:["literary","dark"], roles:["support","accent"], strength:"B"},
+  {tag:"huke", name:"huke", styles:["literary","dark","sharp"], roles:["lead"], strength:"B"},
+  {tag:"so-bin", name:"so-bin", styles:["literary","dark","concept"], roles:["lead"], strength:"B"},
+
+  // -- 韩系 --
+  {tag:"modare", name:"modare", styles:["korean","commercial","vivid"], roles:["lead","support"], strength:"A"},
+  {tag:"betabeet", name:"betabeet", styles:["korean","pastel"], roles:["support","accent"], strength:"B"},
+  {tag:"deadnooodles", name:"deadnooodles", styles:["korean","vivid","flat"], roles:["support","accent"], strength:"B"},
+  {tag:"kanda_done", name:"kanda done", styles:["korean","sharp"], roles:["lead","support"], strength:"B"},
+  {tag:"jima", name:"jima", styles:["elegant","ethereal","cool"], roles:["support"], strength:"B"},
+
+  // -- 暗色调 / 幻想 --
+  {tag:"ayami_kojima", name:"ayami kojima", styles:["dark","gorgeous"], roles:["lead","support"], strength:"A"},
+  {tag:"alphonse_mucha", name:"alphonse mucha", styles:["dark","gorgeous","art_nouveau"], roles:["lead","support"], strength:"A"},
+
+  // -- 治愈日常 / 背景 --
+  {tag:"horiguchi_yukiko", name:"horiguchi yukiko", styles:["daily","cute"], roles:["lead"], strength:"A"},
+  {tag:"nishiya_futoshi", name:"nishiya futoshi", styles:["emotional","watercolor","soft"], roles:["support"], strength:"B"},
+  {tag:"itomugi-kun", name:"itomugi-kun", styles:["touhou","narrative","warm"], roles:["lead","support"], strength:"A"},
+  {tag:"gweda", name:"gweda", styles:["daily","atmospheric"], roles:["support","accent"], strength:"B"},
+  {tag:"haneru", name:"haneru", styles:["daily","cute"], roles:["accent"], strength:"B"},
+
+  // -- 其他高评价 --
+  {tag:"omone_hokoma_agm", name:"omone hokoma agm", styles:["photorealistic","dramatic"], roles:["support"], strength:"A"},
+  {tag:"freng", name:"freng", styles:["korean","vivid","alluring"], roles:["support","accent"], strength:"B"},
+  {tag:"kasuga_haruhi", name:"kasuga haruhi", styles:["pastel","sweet","cute"], roles:["support"], strength:"B"},
+  {tag:"tyakomes", name:"tyakomes", styles:["cute","commission","warm"], roles:["support","accent"], strength:"B"},
+  {tag:"konya_karasue", name:"konya karasue", styles:["atmospheric","dreamy","cool"], roles:["support","accent"], strength:"A"},
+  {tag:"ebifurya", name:"ebifurya", styles:["soft","warm","minimal"], roles:["lead","support"], strength:"A"},
+  {tag:"wanke", name:"wanke", styles:["ornate","theatrical","cool"], roles:["lead","support"], strength:"A"},
+  {tag:"quasarcake", name:"quasarcake", styles:["cool","atmospheric","fantasy"], roles:["support","accent"], strength:"B"},
+  {tag:"azuuru", name:"azuuru", styles:["gorgeous","vivid"], roles:["lead"], strength:"A"},
+  {tag:"zuizi", name:"zuizi", styles:["expressive","narrative"], roles:["lead","support"], strength:"B"},
+  {tag:"weri", name:"weri", styles:["commercial","pastel","warm"], roles:["support"], strength:"B"},
+  {tag:"mamimi", name:"mamimi", styles:["vivid","cute"], roles:["support","accent"], strength:"B"},
+  {tag:"zheng", name:"zheng", styles:["dynamic","warm","vivid"], roles:["support","accent"], strength:"B"},
+  {tag:"makoto_shinkai", name:"makoto shinkai", styles:["atmospheric","gorgeous"], roles:["lead","support"], strength:"A"},
+  {tag:"soejima_shigenori", name:"soejima shigenori", styles:["sharp","unique"], roles:["lead"], strength:"A"},
+
+  // -- 新增：锐利线条补充 --
+  {tag:"takeuchi_takashi", name:"takeuchi takashi", styles:["sharp","commercial"], roles:["lead","support"], strength:"A"},
+  {tag:"shimada_fumikane", name:"shimada fumikane", styles:["sharp","unique"], roles:["lead","support"], strength:"A"},
+  {tag:"houtengeki", name:"houtengeki", styles:["gorgeous","unique"], roles:["lead","support"], strength:"A"},
+  {tag:"yaegashi_nan", name:"yaegashi nan", styles:["sharp","dynamic","vivid"], roles:["lead"], strength:"A"},
+
+  // -- 新增：写实向补充 --
+  {tag:"minaba_hideo", name:"minaba hideo", styles:["epic","fantasy","detailed"], roles:["lead"], strength:"S"},
+
+  // -- 新增：精致商业补充 --
+  {tag:"tsunako", name:"tsunako", styles:["commercial","cute","vivid"], roles:["lead","support"], strength:"A"},
+  {tag:"tomose_shunsaku", name:"tomose shunsaku", styles:["commercial","refined"], roles:["lead","support"], strength:"A"},
+  {tag:"ito_noizi", name:"ito noizi", styles:["commercial","warm","refined"], roles:["lead","support"], strength:"A"},
+  {tag:"fujima_takuya", name:"fujima takuya", styles:["romantic","atmospheric","warm"], roles:["support"], strength:"B"},
+
+  // -- 新增：独特风格补充 --
+  {tag:"avogado6", name:"avogado6", styles:["unique","dark","concept"], roles:["lead"], strength:"A"},
+  {tag:"dairi", name:"dairi", styles:["unique","refined"], roles:["support","accent"], strength:"A"},
+  {tag:"sofra", name:"sofra", styles:["quiet","intimate","soft"], roles:["support","accent"], strength:"B"},
+  {tag:"sumiyao \\(amam\\)", name:"sumiyao(amam)", styles:["vivid","unique"], roles:["lead","support"], strength:"B"},
+
+  // -- 新增：氛围/背景补充 --
+  {tag:"mauve", name:"mauve", styles:["kawaii","decorative","cool"], roles:["support","accent"], strength:"B"},
+
+  // -- 新增：萌系/SFW补充 --
+  {tag:"naga_u", name:"naga u", styles:["minimal","deadpan","kawaii"], roles:["support","accent"], strength:"A"},
+  {tag:"crote", name:"crote", styles:["refined","unique"], roles:["support","accent"], strength:"A"},
+  {tag:"onikobe_rin", name:"onikobe rin", styles:["atmospheric","refined"], roles:["support"], strength:"B"},
+  {tag:"nekotoufu", name:"nekotoufu", styles:["manga","expressive","warm"], roles:["support","accent"], strength:"B"},
+  {tag:"yamamoto_souichirou", name:"yamamoto souichirou", styles:["daily","cute"], roles:["accent"], strength:"B"},
+
+  // -- 新增：S级画师补充 --
+  {tag:"redjuice", name:"redjuice", styles:["realistic","concept","sharp"], roles:["lead"], strength:"S"},
+  {tag:"rin_yuu", name:"rin yuu", styles:["cute","soft","refined"], roles:["lead","support"], strength:"S"},
+  {tag:"hammer \\(sunset_beach\\)", name:"hammer", styles:["cute","warm","gorgeous"], roles:["lead","support"], strength:"S"},
+  {tag:"haruyama_kazunori", name:"haruyama kazunori", styles:["atmospheric","daily","refined"], roles:["lead","support"], strength:"S"},
+
+  // -- 新増：薄弱风格补充 (watercolor/ink/cyber/simple) --
+  {tag:"atelier_bono", name:"atelier bono", styles:["watercolor","realistic","warm"], roles:["lead","support"], strength:"A"},
+  {tag:"peach_momoko", name:"peach momoko", styles:["watercolor","gorgeous","soft"], roles:["lead"], strength:"A"},
+  {tag:"aoi_ogata", name:"aoi ogata", styles:["ink","simple","dark"], roles:["lead","support"], strength:"A"},
+  {tag:"yuzuha \\(yuzutime\\)", name:"yuzuha", styles:["ink","watercolor","soft"], roles:["support","accent"], strength:"B"},
+  {tag:"sukabu", name:"sukabu", styles:["cyber","sharp","concept"], roles:["lead","support"], strength:"A"},
+  {tag:"mocha \\(cotton\\)", name:"mocha", styles:["simple","atmospheric","soft"], roles:["support","accent"], strength:"B"}
+];
+
+// =============================================
+// Style definitions
+// =============================================
+const STYLE_LABELS = {
+  refined:"细腻", gorgeous:"华丽", sharp:"锐利", concept:"概念", cute:"萌系",
+  realistic:"写实", literary:"文艺", korean:"韩系", dark:"暗色", daily:"日常",
+  thick_paint:"厚涂", dynamic:"动感", dreamy:"梦幻", vivid:"鲜艳", atmospheric:"氛围",
+  unique:"独特", pastel:"淡雅", warm:"暖色", watercolor:"水彩", ink:"水墨",
+  commercial:"商业", cyber:"赛博", art_nouveau:"新艺术"
+};
+
+// Chinese names / aliases for search
+const CN_NAMES = {
+  // === Verified by Bilibili/Baidu research ===
+  "rella":"蘑菇太太",
+  "mika_pikazo":"米卡皮卡佐",
+  "kedama_milk":"毛玉牛乳",
+  "morikura_en":"森仓圆",
+  "mochizuki_kei":"望月けい/望月太太",
+  "mignon":"闵勇",
+  "wlop":"王凌/鬼刀",
+  "krenz_cushart":"K大/Krenz",
+  "kawacy":"河CY",
+  "dishwasher1910":"洗碗机",
+  "demizu_posuka":"出水波斯卡",
+  "atdan":"原子Dan",
+  "fkey":"菲奇子",
+  "murata_range":"村田莲尔",
+  "ayami_kojima":"小岛文美",
+  "alphonse_mucha":"穆夏",
+  "makoto_shinkai":"新海诚",
+  "soejima_shigenori":"副岛成记",
+  "takeuchi_takashi":"武内崇",
+  "shimada_fumikane":"岛田文金",
+  "yaegashi_nan":"八重樫南",
+  "minaba_hideo":"皆叶英夫",
+  "tsunako":"津阁",
+  "tomose_shunsaku":"无限轨道",
+  "ito_noizi":"伊东杂音",
+  "fujima_takuya":"藤真拓哉",
+  "avogado6":"牛油果",
+  "redjuice":"红汁",
+  "horiguchi_yukiko":"堀口悠纪子",
+  "nishiya_futoshi":"西屋太志",
+  "nekotoufu":"猫豆腐",
+  "yamamoto_souichirou":"山本崇一朗",
+  "haruyama_kazunori":"春山和则",
+  "peach_momoko":"桃桃子",
+  "aoi_ogata":"尾形瞳",
+  // === Kanji readings (high confidence) ===
+  "shiratama \\(shiratamaco\\)":"白玉",
+  "momoko \\(momopoco\\)":"桃子",
+  "soraneko_hino":"空猫",
+  "abara_heiki":"肋骨兵器",
+  "sumiyao \\(amam\\)":"墨尧",
+  "kasuga_haruhi":"春日はるひ",
+  "ningen_mame":"人间まめ",
+  // === v3.8.4: Additional verified names ===
+  "yoneyama_mai":"米山舞",
+  "ilya_kuvshinov":"伊利亚·库夫希诺夫/伊利亚",
+  "fuzichoco":"藤ちょこ/藤巧克力",
+  "rurudo":"露露多",
+  "loundraw":"loundraw/朗道",
+  "huke":"huke/胡克",
+  "hiten \\(hitenkei\\)":"Hiten/飛天",
+  "lack":"LAck",
+  "nardack":"Nardack/纳达克",
+  "vofan":"VOFAN",
+  "so-bin":"so-bin",
+  "anmi":"Anmi",
+  "ciloranko":"ciloranko/しろらんこ",
+  "miv4t":"miv4t",
+  "as109":"AS109",
+  "homare":"誉/homare",
+  "toridamono":"鳥田もの"
+};
+// =============================================
+// State
+// =============================================
+const VERSION = "3.8.6";
+
+let currentMode = 'manual';
+let activeStyles = new Set();
+let selected = []; // [{artist, role, weight}]
+let undoStack = []; // previous states for undo
+const MAX_UNDO = 10;
+let recentLeads = []; // EXP-009: anti-repetition memory
+const MAX_RECENT_LEADS = 5;
+let excludedTags = new Set(JSON.parse(localStorage.getItem('artist_excluded')||'[]'));
+let lastToggledTag = null;
+let lastToggleAction = null;
+let _detailArtist = null;
+let _lastOutputText = '';
+let _batchCandidates = [];
+let redoStack = [];
+let _previewTimer = null;
+let _previewEl = null;
+let _lastMouseX = 0, _lastMouseY = 0;
+{ const _gi=[13,27,31,39,45,49,54,59,61,66,81,85,86,90,94,95,100,104,110];
+const _gn=["细腻清新","华丽光影","锐利力量","概念厚涂","萌系可爱","写实","文艺沉稳","韩系","幻想暗调","治愈日常","综合精选","锐利力量","写实","商业精致","独特风格","治愈日常","萌系可爱","综合精选","水彩/特殊"];
+ARTISTS.forEach((a,idx)=>{for(let i=0;i<_gi.length;i++){if(idx<_gi[i]){a._group=_gn[i];return;}}a._group="其他";}); }
+const ARTIST_BY_TAG = new Map(ARTISTS.map(a => [a.tag, a]));
+// Build search index AFTER _group assignment
+const _SEARCH_IDX = new Map();
+ARTISTS.forEach(a => {
+  const parts = [a.tag, a.name];
+  const cn = CN_NAMES[a.tag];
+  if (cn) parts.push(cn);
+  a.styles.forEach(s => { if (STYLE_LABELS[s]) parts.push(STYLE_LABELS[s]); });
+  if (a._group) parts.push(a._group);
+  _SEARCH_IDX.set(a.tag, parts.join('|').toLowerCase());
+});
+const GROUP_ORDER=["细腻清新","华丽光影","锐利力量","概念厚涂","萌系可爱","写实","文艺沉稳","韩系","幻想暗调","治愈日常","商业精致","独特风格","水彩/特殊","综合精选"];
+
+function syncUndoBtn() {
+  const btn = document.getElementById('undoBtn');
+  if (btn) btn.disabled = undoStack.length === 0;
+  const rbtn = document.getElementById('redoBtn');
+  if (rbtn) rbtn.disabled = redoStack.length === 0;
+}
+
+function saveState() {
+  undoStack.push(JSON.stringify(selected.map(s => ({tag:s.artist.tag, role:s.role, weight:s.weight}))));
+  if (undoStack.length > MAX_UNDO) undoStack.shift();
+  redoStack = [];
+  syncUndoBtn();
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  redoStack.push(JSON.stringify(selected.map(s => ({tag:s.artist.tag, role:s.role, weight:s.weight}))));
+  const prev = JSON.parse(undoStack.pop());
+  selected = prev.map(p => {
+    const artist = ARTIST_BY_TAG.get(p.tag);
+    return artist ? {artist, role:p.role, weight:p.weight} : null;
+  }).filter(Boolean);
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+  syncUndoBtn();
+}
+function redo() {
+  if (redoStack.length === 0) return;
+  undoStack.push(JSON.stringify(selected.map(s => ({tag:s.artist.tag, role:s.role, weight:s.weight}))));
+  const next = JSON.parse(redoStack.pop());
+  selected = next.map(p => {
+    const artist = ARTIST_BY_TAG.get(p.tag);
+    return artist ? {artist, role:p.role, weight:p.weight} : null;
+  }).filter(Boolean);
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+  syncUndoBtn();
+}
+let comboHistory = JSON.parse(localStorage.getItem('artist_history')||'[]');
+
+// =============================================
+// Initialization
+// =============================================
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') === 'dark';
+  if (isDark) {
+    html.removeAttribute('data-theme');
+    localStorage.setItem('artist_theme', 'light');
+    document.getElementById('themeToggle').innerHTML = '&#9790;';
+  } else {
+    html.setAttribute('data-theme', 'dark');
+    localStorage.setItem('artist_theme', 'dark');
+    document.getElementById('themeToggle').innerHTML = '&#9788;';
+  }
+}
+
+// Scroll lock: prevent layout shift when hiding scrollbar for modals
+function lockScroll() {
+  document.documentElement.style.overflow = 'hidden';
+}
+function unlockScroll() {
+  document.documentElement.style.overflow = '';
+}
+
+function onSearchInput() {
+  const input = document.getElementById('searchInput');
+  const btn = document.getElementById('searchClear');
+  if (btn) btn.classList.toggle('visible', input.value.length > 0);
+  renderPool();
+}
+
+function clearSearch() {
+  const input = document.getElementById('searchInput');
+  input.value = '';
+  const btn = document.getElementById('searchClear');
+  if (btn) btn.classList.remove('visible');
+  renderPool();
+  input.focus();
+}
+
+function dismissHint() {
+  const el = document.getElementById('featureHint');
+  if (el) { el.style.display = 'none'; }
+  localStorage.setItem('hint_detail_dismissed', '1');
+}
+
+function renderRoleFilters() {
+  const el = document.getElementById('roleFilters');
+  _roleBtns = [];
+  const counts = {lead:0, support:0, accent:0};
+  ARTISTS.forEach(a => a.roles.forEach(r => { if (counts[r] !== undefined) counts[r]++; }));
+  const labels = {lead:'可主导', support:'可辅助', accent:'可点缀'};
+  el.innerHTML = '';
+  ['lead','support','accent'].forEach(role => {
+    const btn = document.createElement('button');
+    btn.className = 'role-btn';
+    btn.innerHTML = `${labels[role]} <span style="font-size:10px;opacity:0.6">${counts[role]}</span>`;
+    btn.onclick = () => toggleRoleFilter(role, btn);
+    el.appendChild(btn);
+    _roleBtns.push(btn);
+  });
+  const undoBtn = document.createElement('button');
+  undoBtn.className = 'undo-btn';
+  undoBtn.id = 'undoBtn';
+  undoBtn.textContent = '撤销';
+  undoBtn.disabled = true;
+  undoBtn.title = '撤销上一步操作';
+  undoBtn.onclick = undo;
+  el.appendChild(undoBtn);
+  const redoBtn = document.createElement('button');
+  redoBtn.className = 'redo-btn';
+  redoBtn.id = 'redoBtn';
+  redoBtn.textContent = '重做';
+  redoBtn.disabled = true;
+  redoBtn.title = '重做上一步撤销';
+  redoBtn.onclick = redo;
+  el.appendChild(redoBtn);
+}
+
+function init() {
+  // Set version labels
+  const vl = document.getElementById('verLabel'); if (vl) vl.textContent = 'v' + VERSION;
+  const vf = document.getElementById('verFooter'); if (vf) vf.textContent = 'v' + VERSION;
+  renderStyleFilters();
+  renderRoleFilters();
+  renderStrengthFilters();
+  _initPoolTags();
+  _initPoolDelegation();
+  renderPool();
+  initMiniPreview();
+  renderFavorites();
+  renderHistory();
+  populateAutoStyles();
+  // Hide hint if previously dismissed
+  if (localStorage.getItem('hint_detail_dismissed')) {
+    const el = document.getElementById('featureHint');
+    if (el) el.style.display = 'none';
+  }
+  // Restore theme (auto-detect if no saved preference)
+  const savedTheme = localStorage.getItem('artist_theme');
+  if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('themeToggle').innerHTML = '&#9788;';
+  }
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['manual','auto','random'][i]===mode);
+  });
+  document.getElementById('autoPanel').style.display = mode==='auto'?'block':'none';
+  if (mode!=='auto') document.getElementById('batchPreview').style.display='none';
+  document.getElementById('randomPanel').style.display = mode==='random'?'block':'none';
+  document.getElementById('manualActions').style.display = mode==='manual'?'flex':'none';
+}
+
+// =============================================
+// Style Filters
+// =============================================
+const STYLE_COUNTS = {};
+ARTISTS.forEach(a => a.styles.forEach(s => { STYLE_COUNTS[s] = (STYLE_COUNTS[s]||0) + 1; }));
+function renderStyleFilters() {
+  const styleCounts = STYLE_COUNTS;
+  const el = document.getElementById('styleFilters');
+  el.innerHTML = '';
+  _styleBtns = [];
+  Object.keys(styleCounts).sort().forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'style-btn';
+    btn.innerHTML = `${STYLE_LABELS[s]||s} <span style="font-size:10px;opacity:0.6;margin-left:2px">${styleCounts[s]}</span>`;
+    btn.onclick = () => { toggleStyle(s, btn); };
+    el.appendChild(btn);
+    _styleBtns.push(btn);
+  });
+}
+
+function toggleStyle(style, btn) {
+  if (activeStyles.has(style)) { activeStyles.delete(style); btn.classList.remove('active'); }
+  else { activeStyles.add(style); btn.classList.add('active'); }
+  renderPool();
+}
+
+// =============================================
+// Artist Pool
+// =============================================
+let activeRoleFilter = '';
+let activeStrengthFilter = '';
+let _strengthBtns = [], _roleBtns = [], _styleBtns = [];
+
+function renderStrengthFilters() {
+  const el = document.getElementById('strengthFilters');
+  _strengthBtns = [];
+  const counts = {S:0, A:0, B:0};
+  ARTISTS.forEach(a => { if (counts[a.strength] !== undefined) counts[a.strength]++; });
+  el.innerHTML = '';
+  ['S','A','B'].forEach(s => {
+    const btn = document.createElement('button');
+    btn.className = 'strength-btn';
+    btn.innerHTML = s + '\u7EA7 <span style="font-size:10px;opacity:0.6">' + counts[s] + '</span>';
+    btn.onclick = () => toggleStrengthFilter(s, btn);
+    el.appendChild(btn);
+    _strengthBtns.push(btn);
+  });
+}
+
+function toggleStrengthFilter(strength, btn) {
+  if (activeStrengthFilter === strength) {
+    activeStrengthFilter = '';
+    btn.classList.remove('active');
+  } else {
+    activeStrengthFilter = strength;
+    _strengthBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  renderPool();
+}
+
+function toggleRoleFilter(role, btn) {
+  if (activeRoleFilter === role) {
+    activeRoleFilter = '';
+    btn.classList.remove('active');
+  } else {
+    activeRoleFilter = role;
+    _roleBtns.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+  renderPool();
+}
+
+let _searchInputEl = null;
+function getFilteredArtists() {
+  let list = ARTISTS;
+  if (!_searchInputEl) _searchInputEl = document.getElementById('searchInput');
+  const q = _searchInputEl.value.toLowerCase().trim();
+  if (q) {
+    // Phase 1: exact substring match on all indexed fields
+    let matched = list.filter(a => _SEARCH_IDX.get(a.tag).includes(q));
+    // Phase 2: if no results, try character subsequence (fuzzy)
+    if (matched.length === 0 && q.length >= 2) {
+      matched = list.filter(a => {
+        const idx = _SEARCH_IDX.get(a.tag);
+        let pos = 0;
+        for (let i = 0; i < q.length; i++) {
+          pos = idx.indexOf(q[i], pos);
+          if (pos < 0) return false;
+          pos++;
+        }
+        return true;
+      });
+    }
+    list = matched;
+  }
+  if (activeStyles.size > 0) list = list.filter(a => a.styles.some(s => activeStyles.has(s)));
+  if (activeRoleFilter) list = list.filter(a => a.roles.includes(activeRoleFilter));
+  if (activeStrengthFilter) list = list.filter(a => a.strength === activeStrengthFilter);
+  return list;
+}
+
+// =============================================
+// Pool Tag Cache + Event Delegation (#2/#5)
+// =============================================
+const _poolTags = new Map();
+let _lastHoveredTag = null;
+let _poolLpTimer = null;
+let _poolLpFired = false;
+function _createPoolTag(a) {
+  const tag = document.createElement('span');
+  tag.className = 'artist-tag';
+  tag.dataset.tag = a.tag;
+  tag._artist = a;
+  const topDims = getTopDims(a);
+  const dimStr = topDims.length > 0 ? topDims.map(d => VEC_DIM_LABELS[d.dim]||d.dim).slice(0,2).join('/') : '';
+  tag._staticHtml = `${a.name} <span class="dim-label">${dimStr}</span>`;
+  tag._lastTooltip = '';
+  return tag;
+}
+function _initPoolTags() {
+  ARTISTS.forEach(a => _poolTags.set(a.tag, _createPoolTag(a)));
+}
+
+function _initPoolDelegation() {
+  const pool = document.getElementById('artistPool');
+  pool.addEventListener('click', (e) => {
+    if (_poolLpFired) { _poolLpFired = false; return; }
+    const el = e.target.closest('.artist-tag');
+    if (!el) return;
+    if (e.shiftKey) { toggleExclude(el._artist); return; }
+    toggleArtist(el._artist);
+  });
+  pool.addEventListener('contextmenu', (e) => {
+    const el = e.target.closest('.artist-tag');
+    if (!el) return;
+    e.preventDefault();
+    showDetail(el._artist);
+  });
+  pool.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.artist-tag');
+    if (!el || el === _lastHoveredTag) return;
+    _lastHoveredTag = el;
+    document.body.classList.add('preview-active');
+    showMiniPreview(el._artist, e);
+  });
+  pool.addEventListener('mouseout', (e) => {
+    const el = e.target.closest('.artist-tag');
+    if (!el) return;
+    const rt = e.relatedTarget;
+    if (rt && rt.closest && rt.closest('.artist-tag') === el) return;
+    if (el === _lastHoveredTag) _lastHoveredTag = null;
+    hideMiniPreview();
+    document.body.classList.remove('preview-active');
+  });
+  pool.addEventListener('mousemove', (e) => {
+    _lastMouseX = e.clientX; _lastMouseY = e.clientY;
+    if (_previewEl && _previewEl.style.display==='block') {
+      _previewEl.style.left=Math.min(e.clientX+12,window.innerWidth-216)+'px';
+      _previewEl.style.top=Math.min(e.clientY+12,window.innerHeight-200)+'px';
+    }
+  });
+  pool.addEventListener('touchstart', (e) => {
+    const el = e.target.closest('.artist-tag');
+    if (!el) return;
+    _poolLpTimer = setTimeout(() => { _poolLpTimer = 'fired'; _poolLpFired = true; showDetail(el._artist); }, 500);
+  }, {passive:true});
+  pool.addEventListener('touchend', (e) => {
+    if (_poolLpTimer === 'fired') { e.preventDefault(); } else if (_poolLpTimer) clearTimeout(_poolLpTimer);
+    _poolLpTimer = null;
+  });
+  pool.addEventListener('touchmove', () => {
+    if (_poolLpTimer && _poolLpTimer !== 'fired') clearTimeout(_poolLpTimer);
+    _poolLpTimer = null;
+  }, {passive:true});
+}
+
+const _groupHeaders = new Map();
+function _getGroupHeader(g) {
+  let h = _groupHeaders.get(g);
+  if (!h) { h = document.createElement('div'); h.className = 'pool-group-header'; _groupHeaders.set(g, h); }
+  return h;
+}
+function renderPool() {
+  const pool = document.getElementById('artistPool');
+  const filtered = getFilteredArtists();
+  const selectedTagSet = new Set(selected.map(s => s.artist.tag));
+  const selectedByTag = new Map(selected.map(s => [s.artist.tag, s]));
+  const compatMap = new Map();
+  if (selected.length > 0) {
+    filtered.forEach(a => {
+      if (selectedTagSet.has(a.tag)) return;
+      const avg = selected.reduce((sum, s) => sum + compatScore(s.artist, a), 0) / selected.length;
+      compatMap.set(a.tag, avg);
+    });
+  }
+  const groups = {};
+  filtered.forEach(a => {
+    const g = a._group || '\u5176\u4ED6';
+    if (!groups[g]) groups[g] = [];
+    groups[g].push(a);
+  });
+  const updateTag = (a) => {
+    const tag = _poolTags.get(a.tag);
+    tag.className = 'artist-tag';
+    const sel = selectedByTag.get(a.tag);
+    if (sel) tag.classList.add('selected-' + sel.role);
+    else if (compatMap.has(a.tag) && compatMap.get(a.tag) < 0.3) tag.classList.add('compat-low');
+    if (excludedTags.has(a.tag)) tag.classList.add('excluded');
+    if (a.tag === lastToggledTag) {
+      tag.classList.add(lastToggleAction === 'select' ? 'anim-pop' : 'anim-shrink');
+      tag.addEventListener('animationend', () => tag.classList.remove('anim-pop','anim-shrink'), {once:true});
+      lastToggledTag = null;
+    }
+    // Update tooltip only if compat data changed
+    let tooltipHtml = '';
+    const topDims3 = getTopDims(a).slice(0, 3);
+    if (topDims3.length > 0 || compatMap.has(a.tag)) {
+      tooltipHtml = '<div class="tag-tooltip"><div class="tag-tooltip-dims">';
+      if (topDims3.length > 0) tooltipHtml += topDims3.map(d => `<span class="tag-tooltip-dim">${VEC_DIM_LABELS[d.dim]} ${d.val.toFixed(1)}</span>`).join('');
+      tooltipHtml += '</div>';
+      if (compatMap.has(a.tag)) {
+        const cs = compatMap.get(a.tag);
+        const cc = cs >= 0.6 ? 'var(--green)' : cs >= 0.3 ? 'var(--orange)' : 'var(--red)';
+        tooltipHtml += `<div class="tag-tooltip-compat">兼容度 <span class="tag-tooltip-score" style="color:${cc}">${Math.round(cs*100)}</span></div>`;
+      }
+      tooltipHtml += '</div>';
+    }
+    if (tooltipHtml !== tag._lastTooltip) {
+      tag.innerHTML = tag._staticHtml + tooltipHtml;
+      tag._lastTooltip = tooltipHtml;
+    }
+    return tag;
+  };
+  // Build new child list via DocumentFragment (no innerHTML wipe)
+  const frag = document.createDocumentFragment();
+  const appendGroup = (g) => {
+    if (!groups[g] || groups[g].length === 0) return;
+    const hdr = _getGroupHeader(g);
+    hdr.textContent = g + ' ' + groups[g].length;
+    frag.appendChild(hdr);
+    groups[g].forEach(a => frag.appendChild(updateTag(a)));
+  };
+  GROUP_ORDER.forEach(appendGroup);
+  Object.keys(groups).forEach(g => { if (!GROUP_ORDER.includes(g)) appendGroup(g); });
+  pool.replaceChildren(frag);
+  const styleDist = {};
+  filtered.forEach(a => a.styles.forEach(s => { styleDist[s] = (styleDist[s]||0) + 1; }));
+  const topStyles = Object.entries(styleDist).sort((a,b) => b[1]-a[1]).slice(0,4).map(([s,n]) => (STYLE_LABELS[s]||s) + ' ' + n).join(' / ');
+  let statsHtml = `\u663E\u793A <b>${filtered.length}</b> / ${ARTISTS.length} \u4F4D\u753B\u5E08 | \u5DF2\u9009 <b>${selected.length}</b> \u4F4D`;
+  if (excludedTags.size > 0) statsHtml += ` | <span style="color:var(--red);cursor:pointer;font-size:11px" onclick="clearExcluded()">\u5DF2\u6392\u9664 ${excludedTags.size} \u4F4D \u2715</span>`;
+  statsHtml += ` | <span style="color:var(--text3)">${topStyles}</span>`;
+  document.getElementById('poolStats').innerHTML = statsHtml;
+}
+
+function toggleArtist(artist) {
+  saveState();
+  const idx = selected.findIndex(s => s.artist.tag === artist.tag);
+  if (idx >= 0) {
+    selected.splice(idx, 1);
+    lastToggledTag = artist.tag;
+    lastToggleAction = 'deselect';
+  } else {
+    let role, weight;
+    if (selected.length === 0) { role = 'lead'; weight = 1.0; }
+    else if (selected.length === 1) { role = 'support'; weight = 0.8; }
+    else { role = 'accent'; weight = 0.6; }
+    selected.push({artist, role, weight});
+    lastToggledTag = artist.tag;
+    lastToggleAction = 'select';
+  }
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+}
+
+// =============================================
+// Weight Controls
+// =============================================
+let _weightSectionEl = null;
+let _weightDelegated = false;
+let _wDragIdx = null;
+function _initWeightDelegation(section) {
+  if (_weightDelegated) return;
+  _weightDelegated = true;
+  section.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const idx = parseInt(btn.dataset.idx);
+    if (action === 'role') cycleRole(idx);
+    else if (action === 'up') moveArtist(idx, -1);
+    else if (action === 'down') moveArtist(idx, 1);
+    else if (action === 'remove') removeArtist(idx);
+  });
+  section.addEventListener('input', (e) => {
+    if (e.target.classList.contains('weight-slider')) {
+      const idx = parseInt(e.target.dataset.idx);
+      updateWeight(idx, e.target.value);
+    }
+  });
+  section.addEventListener('change', (e) => {
+    if (e.target.classList.contains('weight-slider')) saveState();
+  });
+  section.addEventListener('dragstart', (e) => {
+    const row = e.target.closest('.weight-row');
+    if (!row) return;
+    _wDragIdx = parseInt(row.dataset.idx);
+    row.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  section.addEventListener('dragend', (e) => {
+    const row = e.target.closest('.weight-row');
+    if (row) row.classList.remove('dragging');
+    section.querySelectorAll('.weight-row.drag-over').forEach(r => r.classList.remove('drag-over'));
+  });
+  section.addEventListener('dragover', (e) => {
+    const row = e.target.closest('.weight-row');
+    if (!row) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    row.classList.add('drag-over');
+  });
+  section.addEventListener('dragleave', (e) => {
+    const row = e.target.closest('.weight-row');
+    if (row) row.classList.remove('drag-over');
+  });
+  section.addEventListener('drop', (e) => {
+    const row = e.target.closest('.weight-row');
+    if (!row) return;
+    e.preventDefault();
+    row.classList.remove('drag-over');
+    const toIdx = parseInt(row.dataset.idx);
+    if (_wDragIdx !== null && _wDragIdx !== toIdx) {
+      saveState();
+      const [item] = selected.splice(_wDragIdx, 1);
+      selected.splice(toIdx, 0, item);
+      const _roles = ['lead','support','accent','accent'];
+      selected.forEach((s,j) => { s.role = _roles[j] || 'accent'; });
+      renderWeights(); renderPool(); renderOutput(); checkConflicts();
+    }
+    _wDragIdx = null;
+  });
+}
+function renderWeights() {
+  if (!_weightSectionEl) _weightSectionEl = document.getElementById('weightSection');
+  const section = _weightSectionEl;
+  const presetRow = document.getElementById('presetRow');
+  if (selected.length === 0) {
+    section.innerHTML = '<div class="empty-hint">在下方画师池中点击添加到组合</div>';
+    if (presetRow) presetRow.style.display = 'none';
+    return;
+  }
+  if (presetRow) presetRow.style.display = 'flex';
+  _initWeightDelegation(section);
+  const rows = section.querySelectorAll('.weight-row');
+  const needRebuild = rows.length !== selected.length ||
+    selected.some((s, i) => !rows[i] || rows[i].dataset.tag !== s.artist.tag);
+  if (needRebuild) {
+    section.innerHTML = '';
+    selected.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'weight-row';
+      row.draggable = true;
+      row.dataset.idx = i;
+      row.dataset.tag = s.artist.tag;
+      const dims = getTopDims(s.artist);
+      const dimHtml = dims.map(d => `<span style="font-size:10px;padding:1px 5px;background:var(--accent-dim);border-radius:8px;color:var(--accent)">${VEC_DIM_LABELS[d.dim]} ${d.val.toFixed(1)}</span>`).join(' ');
+      row.innerHTML = `
+        <span class="weight-role ${s.role==='lead'?'lead':s.role==='support'?'support':'acnt'}" data-action="role" data-idx="${i}" title="点击切换角色">${s.role==='lead'?'主':s.role==='support'?'辅':'点'}</span>
+        <span class="weight-name">${s.artist.name}</span>
+        <span style="display:flex;gap:3px;flex-shrink:0">${dimHtml}</span>
+        <input type="range" class="weight-slider" min="0.1" max="1.3" step="0.1" value="${s.weight}" data-idx="${i}">
+        <span class="weight-val" id="wv${i}">${s.weight.toFixed(1)}</span>
+        <button class="weight-move" data-action="up" data-idx="${i}" ${i===0?'disabled':''}>&uarr;</button>
+        <button class="weight-move" data-action="down" data-idx="${i}" ${i===selected.length-1?'disabled':''}>&darr;</button>
+        <button class="weight-remove" data-action="remove" data-idx="${i}">x</button>
+      `;
+      section.appendChild(row);
+    });
+  } else {
+    // In-place update: only refresh role/weight/idx without rebuilding DOM
+    selected.forEach((s, i) => {
+      const row = rows[i];
+      row.dataset.idx = i;
+      const roleEl = row.querySelector('.weight-role');
+      const rc = s.role==='lead'?'lead':s.role==='support'?'support':'acnt';
+      roleEl.className = 'weight-role ' + rc;
+      roleEl.dataset.idx = i;
+      roleEl.textContent = s.role==='lead'?'主':s.role==='support'?'辅':'点';
+      const slider = row.querySelector('.weight-slider');
+      slider.dataset.idx = i;
+      if (parseFloat(slider.value) !== s.weight) slider.value = s.weight;
+      const valEl = row.querySelector('.weight-val');
+      valEl.id = 'wv' + i;
+      valEl.textContent = s.weight.toFixed(1);
+      row.querySelectorAll('[data-action]').forEach(el => { el.dataset.idx = i; });
+      const upBtn = row.querySelector('[data-action="up"]');
+      const downBtn = row.querySelector('[data-action="down"]');
+      if (upBtn) upBtn.disabled = i === 0;
+      if (downBtn) downBtn.disabled = i === selected.length - 1;
+    });
+  }
+}
+
+function applyPreset(preset) {
+  if (selected.length === 0) return;
+  saveState();
+  const presets = {
+    'balanced': () => selected.forEach((s,i) => s.weight = [1.0, 0.8, 0.6, 0.5][i] || 0.5),
+    'lead-heavy': () => selected.forEach((s,i) => s.weight = [1.2, 0.6, 0.4, 0.3][i] || 0.3),
+    'light': () => selected.forEach((s,i) => s.weight = [0.7, 0.7, 0.5, 0.4][i] || 0.4),
+    'equal': () => selected.forEach(s => s.weight = 0.8),
+  };
+  if (presets[preset]) presets[preset]();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+}
+
+let _conflictDebounce = null;
+function updateWeight(idx, val) {
+  const w = parseFloat(val);
+  selected[idx].weight = w;
+  document.getElementById('wv'+idx).textContent = w.toFixed(1);
+  renderOutput();
+  updateStrength();
+  if (_conflictDebounce) clearTimeout(_conflictDebounce);
+  _conflictDebounce = setTimeout(checkConflicts, 300);
+}
+
+function cycleRole(idx) {
+  saveState();
+  const roles = ['lead', 'support', 'accent'];
+  const cur = roles.indexOf(selected[idx].role);
+  selected[idx].role = roles[(cur + 1) % 3];
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+}
+
+function moveArtist(idx, dir) {
+  const newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= selected.length) return;
+  saveState();
+  [selected[idx], selected[newIdx]] = [selected[newIdx], selected[idx]];
+  // Reassign roles based on position
+  const roles = ['lead', 'support', 'accent', 'accent'];
+  selected.forEach((s, i) => { s.role = roles[i] || 'accent'; });
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+}
+
+function removeArtist(idx) {
+  saveState();
+  selected.splice(idx, 1);
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+}
+
+// =============================================
+// Conflict Detection
+// =============================================
+function checkConflicts() {
+  const panel = document.getElementById('conflictPanel');
+  const scoreEl = document.getElementById('comboScoreVal');
+
+  if (selected.length < 2) {
+    if (scoreEl) { scoreEl.textContent = '-'; scoreEl.style.color = ''; }
+    panel.classList.remove('show');
+    updateStrength();
+    return;
+  }
+
+  const score = comboScore(selected.map(s=>s.artist));
+  if (scoreEl) {
+    scoreEl.textContent = score.toFixed(2);
+    scoreEl.style.color = score >= 0.7 ? 'var(--green)' : score >= 0.4 ? 'var(--orange)' : 'var(--red)';
+  }
+
+  let html = '';
+  let hasIssues = false;
+
+  // Check total weight
+  const totalW = selected.reduce((s,x) => s + x.weight, 0);
+  if (totalW > 2.5) {
+    html += '<div class="conflict-weight-warn">总权重 ' + totalW.toFixed(1) + ' 偏高，建议 \u22642.5</div>';
+    hasIssues = true;
+  }
+
+  // Pairwise checks
+  const pairs = [];
+  for (let i = 0; i < selected.length; i++) {
+    for (let j = i+1; j < selected.length; j++) {
+      const vA = getVec(selected[i].artist), vB = getVec(selected[j].artist);
+      if (!vA || !vB) continue;
+      const conf = semanticConflict(vA, vB);
+
+      // Conflict check
+      if (conf > 0.25) {
+        const conflictDims = [];
+        for (const c of VEC_CONFLICTS) {
+          const eAA = Math.max(0, vA[c.aIdx] - c.t) * Math.max(0, vB[c.bIdx] - c.t);
+          const eAB = Math.max(0, vA[c.bIdx] - c.t) * Math.max(0, vB[c.aIdx] - c.t);
+          if ((eAA + eAB) * c.w > 0.05) {
+            conflictDims.push(VEC_DIM_LABELS[c.a] + '/' + VEC_DIM_LABELS[c.b]);
+          }
+        }
+        const severity = conf > 0.5 ? 'severe' : conf > 0.35 ? 'moderate' : 'mild';
+        const label = conf > 0.5 ? '严重' : conf > 0.35 ? '中度' : '轻微';
+        pairs.push({ type:'conflict', severity, label,
+          nameA:selected[i].artist.name, nameB:selected[j].artist.name,
+          dims:conflictDims, score:conf });
+      }
+
+      // Redundancy check
+      let sameDims = 0;
+      for (let d = 0; d < VEC_DIM_COUNT; d++) {
+        if (Math.abs(vA[d] - vB[d]) < 0.15 && (vA[d] > 0.3 || vB[d] > 0.3)) sameDims++;
+      }
+      if (sameDims >= 10) {
+        pairs.push({ type:'redundant', severity:'redundant', label:'重叠',
+          nameA:selected[i].artist.name, nameB:selected[j].artist.name,
+          dims:[], score:0 });
+      }
+    }
+  }
+
+  if (pairs.length > 0) {
+    hasIssues = true;
+    html += '<div class="conflict-summary">' + pairs.length + ' 个风格问题</div>';
+    pairs.forEach(p => {
+      html += '<div class="conflict-pair-row ' + p.severity + '">';
+      html += '<span class="conflict-label">' + p.label + '</span>';
+      if (p.type === 'conflict') {
+        html += '<span class="conflict-names">' + p.nameA + ' + ' + p.nameB + '</span> ';
+        html += '<span class="conflict-dims">';
+        p.dims.forEach(d => { html += '<span class="conflict-dim-tag">' + d + '</span>'; });
+        html += '</span>';
+      } else {
+        html += '<span class="conflict-names">' + p.nameA + ' \u2248 ' + p.nameB + '</span> ';
+        html += '<span style="font-size:10px;color:var(--text3)">风格高度重叠，叠加价值低</span>';
+      }
+      html += '</div>';
+    });
+  }
+
+  if (hasIssues) {
+    panel.innerHTML = html;
+    panel.classList.add('show');
+  } else {
+    panel.classList.remove('show');
+  }
+  updateStrength();
+}
+
+
+// =============================================
+// Output
+// =============================================
+function renderOutput() {
+  const el = document.getElementById('outputText');
+  const descEl = document.getElementById('outputDesc');
+  if (selected.length === 0) {
+    el.textContent = '\u5C1A\u672A\u9009\u62E9\u753B\u5E08';
+    el.style.color = '#666';
+    el.style.textShadow = 'none';
+    if (descEl) { descEl.style.display = 'none'; descEl.textContent = ''; }
+    return;
+  }
+  const roleNames = {lead:'\u4E3B\u753B\u5E08',support:'\u8F85\u52A9',accent:'\u70B9\u7F00'};
+  const descs = selected.map(s => {
+    const role = roleNames[s.role] || s.role;
+    const topDims = getTopDims(s.artist);
+    const dimStr = topDims.slice(0,3).map(d => VEC_DIM_LABELS[d.dim]||d.dim).join('+');
+    return `${s.artist.name}(${role}: ${dimStr||'\u5747\u8861'})`;
+  });
+  if (descEl) {
+    descEl.textContent = descs.join(' | ');
+    descEl.style.display = 'block';
+  }
+  const fmt = (document.getElementById('outputFormat')||{}).value || 'a1111';
+  let text;
+  if (fmt === 'comfyui') {
+    const parts = selected.map(s => {
+      const t = s.artist.tag.split('\\(').join('(').split('\\)').join(')');
+      return '(' + t + ':' + s.weight.toFixed(1) + ')';
+    });
+    text = parts.join(', ') + ',';
+  } else if (fmt === 'tags') {
+    text = selected.map(s => s.artist.tag.split('\\(').join('(').split('\\)').join(')')).join(', ') + ',';
+  } else {
+    const parts = selected.map(s => `(${s.artist.tag}:${s.weight.toFixed(1)})`);
+    text = parts.join(', ') + ',';
+  }
+  el.textContent = text;
+  el.style.color = '';
+  el.style.textShadow = '';
+  if (text !== _lastOutputText) {
+    _lastOutputText = text;
+    const box = document.getElementById('outputBox');
+    box.classList.remove('pulse');
+    requestAnimationFrame(() => { box.classList.add('pulse'); });
+  }
+}
+
+function copyOutput() {
+  const text = document.getElementById('outputText').textContent;
+  if (text === '尚未选择画师') return;
+  const showCopied = () => {
+    const hint = document.querySelector('.copy-hint');
+    if (hint) { hint.textContent = '已复制'; setTimeout(() => hint.textContent = '点击复制', 1200); }
+  };
+  navigator.clipboard.writeText(text).then(showCopied).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+    showCopied();
+  });
+}
+
+function showRecoExplain(diversity) {
+  const el = document.getElementById('recoExplain');
+  if (!el || selected.length < 2) { if (el) el.style.display = 'none'; return; }
+  const parts = [];
+  // Diversity score
+  parts.push('多样性 ' + diversity.toFixed(2));
+  // Per-artist contribution
+  selected.forEach((s, i) => {
+    const topD = getTopDims(s.artist).slice(0, 2);
+    const dimStr = topD.map(d => VEC_DIM_LABELS[d.dim]).join('+');
+    const roleN = {lead:'主导',support:'辅助',accent:'点缀'}[s.role]||s.role;
+    parts.push(s.artist.name + '(' + roleN + ': ' + (dimStr||'均衡') + ')');
+  });
+  // Pairwise compat
+  if (selected.length >= 2) {
+    const score = comboScore(selected.map(s=>s.artist));
+    parts.push('整体兼容度 ' + Math.round(score*100));
+  }
+  el.textContent = parts.join(' | ');
+  el.style.display = 'block';
+}
+
+function hideRecoExplain() {
+  const el = document.getElementById('recoExplain');
+  if (el) el.style.display = 'none';
+}
+
+function clearSelection() {
+  if (selected.length > 0) saveState();
+  redoStack = [];
+  selected = [];
+  hideRecoExplain();
+  document.getElementById('batchPreview').style.display='none';
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+  syncUndoBtn();
+}
+
+function resetAll() {
+  if (selected.length > 0) saveState();
+  redoStack = [];
+  // Clear selection
+  selected = [];
+  hideRecoExplain();
+  document.getElementById('batchPreview').style.display='none';
+  // Clear style filters
+  activeStyles.clear();
+  _styleBtns.forEach(b => b.classList.remove('active'));
+  // Clear role filter
+  activeRoleFilter = '';
+  _roleBtns.forEach(b => b.classList.remove('active'));
+  // Clear strength filter
+  activeStrengthFilter = '';
+  _strengthBtns.forEach(b => b.classList.remove('active'));
+  // Clear search
+  document.getElementById('searchInput').value = '';
+  // Re-render
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+  syncUndoBtn();
+}
+
+// =============================================
+// Auto Generate (Smart Recommendation)
+// =============================================
+function populateAutoStyles() {
+  const sel = document.getElementById('autoStyle');
+  const styles = [...new Set(ARTISTS.flatMap(a=>a.styles))].sort();
+  styles.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s;
+    opt.textContent = STYLE_LABELS[s]||s;
+    sel.appendChild(opt);
+  });
+}
+
+// EXP-009: Combo diversity - average pairwise euclidean distance
+function comboDiversity(artists) {
+  if (artists.length < 2) return 1.0;
+  let total = 0, pairs = 0;
+  for (let i = 0; i < artists.length; i++) {
+    const vA = getVec(artists[i]);
+    if (!vA) continue;
+    for (let j = i+1; j < artists.length; j++) {
+      const vB = getVec(artists[j]);
+      if (!vB) continue;
+      let d = 0;
+      for (let k = 0; k < VEC_DIM_COUNT; k++) d += (vA[k]-vB[k])*(vA[k]-vB[k]);
+      total += Math.sqrt(d / VEC_DIM_COUNT);
+      pairs++;
+    }
+  }
+  return pairs > 0 ? total / pairs : 0.5;
+}
+
+function autoGenerate() {
+  const targetStyle = document.getElementById('autoStyle').value;
+  const count = parseInt(document.getElementById('autoCount').value);
+  let pool = ARTISTS.filter(a => !excludedTags.has(a.tag));
+  if (targetStyle) pool = pool.filter(a => a.styles.includes(targetStyle));
+  let leads = pool.filter(a => a.roles.includes('lead'));
+  if (leads.length === 0) leads = pool.filter(a => a.roles.includes('support'));
+  if (leads.length === 0) leads = pool;
+  if (leads.length === 0) { alert('\u5F53\u524D\u7B5B\u9009\u6761\u4EF6\u4E0B\u6CA1\u6709\u53EF\u7528\u7684\u753B\u5E08'); return; }
+  const candidates = [];
+  for (let i = 0; i < 15; i++) {
+    const combo = generateComboOnce(leads, pool, count);
+    if (combo.length > 0) {
+      const div = comboDiversity(combo.map(c => c.artist));
+      const compat = comboScore(combo.map(c => c.artist));
+      candidates.push({combo, diversity: div, compat, quality: div * 0.4 + compat * 0.6});
+    }
+  }
+  if (candidates.length === 0) { alert('\u751F\u6210\u5931\u8D25\uFF0C\u8BF7\u8C03\u6574\u7B5B\u9009\u6761\u4EF6'); return; }
+  const chosen = selectDiverseBatch(candidates, 4);
+  showBatchPreview(chosen);
+}
+
+function generateComboOnce(leads, pool, count) {
+  // EXP-009: Flattened strength weights S=2, A=1.5, B=1
+  const strengthW = {S:2, A:1.5, B:1};
+  const leadScored = leads.map(a => {
+    let w = strengthW[a.strength] || 1;
+    // EXP-009: Penalize recently used leads
+    if (recentLeads.includes(a.tag)) w *= 0.15;
+    return {artist:a, score: w};
+  });
+  const lead = weightedPick(leadScored, 0.7);
+  if (!lead) return [];
+  const combo = [{artist:lead, role:'lead', weight: 1.0}];
+
+  if (count >= 2) {
+    // EXP-009: Lowered threshold 0.3 → 0.15 to allow more diverse candidates
+    const supportCandidates = pool
+      .filter(a => a.tag !== lead.tag)
+      .map(a => ({ artist: a, score: compatScore(lead, a) }))
+      .filter(x => x.score >= 0.15);
+
+    if (supportCandidates.length > 0) {
+      const support = weightedPick(supportCandidates, 0.7);
+      combo.push({artist: support, role:'support', weight: 0.8});
+
+      if (count >= 3) {
+        const used = [lead.tag, support.tag];
+        const accentCandidates = pool
+          .filter(a => !used.includes(a.tag))
+          .map(a => ({
+            artist: a,
+            score: (compatScore(lead, a) + compatScore(support, a)) / 2
+          }))
+          .filter(x => x.score >= 0.1);
+
+        if (accentCandidates.length > 0) {
+          const accent = weightedPick(accentCandidates, 0.7);
+          combo.push({artist: accent, role:'accent', weight: 0.6});
+
+          if (count >= 4) {
+            const used2 = combo.map(s=>s.artist.tag);
+            const extra = pool
+              .filter(a => !used2.includes(a.tag))
+              .map(a => ({
+                artist: a,
+                score: combo.reduce((s,x) => s + compatScore(x.artist, a), 0) / combo.length
+              }))
+              .filter(x => x.score >= 0.1);
+            if (extra.length > 0) {
+              combo.push({artist: weightedPick(extra, 0.7), role:'accent', weight: 0.4});
+            }
+          }
+        }
+      }
+    }
+  }
+  return combo;
+}
+
+// EXP-008: Weighted random selection with power smoothing
+function weightedPick(scored, power) {
+  if (scored.length === 0) return null;
+  const totalW = scored.reduce((a, x) => a + Math.pow(Math.max(x.score, 0.001), power), 0);
+  let r = Math.random() * totalW;
+  for (const x of scored) {
+    r -= Math.pow(Math.max(x.score, 0.001), power);
+    if (r <= 0) return x.artist;
+  }
+  return scored[scored.length - 1].artist;
+}
+
+// =============================================
+// Vector-based conflict & compatibility (EXP-008)
+// =============================================
+function getVec(artist) {
+  return ARTIST_VECTORS[artist.tag] || null;
+}
+
+function semanticConflict(vecA, vecB) {
+  if (!vecA || !vecB) return 0;
+  let total = 0;
+  for (const c of VEC_CONFLICTS) {
+    const eAA = Math.max(0, vecA[c.aIdx] - c.t);
+    const eBB = Math.max(0, vecB[c.bIdx] - c.t);
+    const eAB = Math.max(0, vecA[c.bIdx] - c.t);
+    const eBA = Math.max(0, vecB[c.aIdx] - c.t);
+    total += (eAA * eBB + eAB * eBA) * c.w;
+  }
+  return total;
+}
+
+function compatScore(artistA, artistB) {
+  const vA = getVec(artistA), vB = getVec(artistB);
+  if (!vA || !vB) return 0.5;
+  const conflict = semanticConflict(vA, vB);
+  let diffSum = 0;
+  for (let i = 0; i < VEC_DIM_COUNT; i++) diffSum += (vA[i]-vB[i])*(vA[i]-vB[i]);
+  const diversity = Math.sqrt(diffSum / VEC_DIM_COUNT);
+  // EXP-009: Softened safety curve (was *2.5, now *1.5)
+  // conflict needs to reach 0.67 to zero out (was 0.4)
+  const safetyScore = Math.max(0, 1.0 - conflict * 1.5);
+  // EXP-009: Boosted diversity weight, steeper near-identical penalty
+  // near-identical (diversity<0.1) gets ~0.15, moderate (0.3+) gets 0.8+
+  const diversityBonus = 0.05 + Math.min(diversity / 0.35, 1.0) * 0.95;
+  // EXP-009: Diversity-weighted blend instead of pure multiplication
+  // Old: safety * diversity (safety dominates)
+  // New: safety^0.6 * diversity^1.2 (diversity has more influence)
+  return Math.pow(safetyScore, 0.6) * Math.pow(diversityBonus, 1.2);
+}
+
+function comboScore(artists) {
+  if (artists.length < 2) return 1.0;
+  let total = 0, pairs = 0;
+  for (let i = 0; i < artists.length; i++) {
+    for (let j = i+1; j < artists.length; j++) {
+      total += compatScore(artists[i], artists[j]);
+      pairs++;
+    }
+  }
+  return pairs > 0 ? total / pairs : 1.0;
+}
+
+function _computeTopDims(artist) {
+  const vec = getVec(artist);
+  if (!vec) return [];
+  return VEC_DIMS.map((d,i) => ({dim:d, val:vec[i]}))
+    .filter(x => x.val >= 0.5)
+    .sort((a,b) => b.val - a.val)
+    .slice(0, 4);
+}
+const TOP_DIMS_CACHE = new Map(ARTISTS.map(a => [a.tag, _computeTopDims(a)]));
+function getTopDims(artist) { return TOP_DIMS_CACHE.get(artist.tag) || []; }
+
+// =============================================
+// Random Generate
+// =============================================
+function randomGenerate() {
+  saveState();
+  const count = parseInt(document.getElementById('randomCount').value);
+  const filtered = getFilteredArtists();
+  const pool = (filtered.length > 0 ? filtered : ARTISTS.slice()).filter(a => !excludedTags.has(a.tag));
+  if (pool.length < count) { alert('画师池不足'); return; }
+  // Best-of-5: generate 5 random combos, pick most diverse
+  const weights = [1.0, 0.8, 0.6, 0.4];
+  const roles = ['lead','support','accent','accent'];
+  let bestCombo = null, bestDiv = -1;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const shuffled = [...pool]; for(let k=shuffled.length-1;k>0;k--){const j=(Math.random()*(k+1))|0;[shuffled[k],shuffled[j]]=[shuffled[j],shuffled[k]];}
+    const combo = [];
+    for (let i = 0; i < Math.min(count, shuffled.length); i++) {
+      combo.push({artist:shuffled[i], role:roles[i]||'accent', weight:weights[i]||0.4});
+    }
+    const div = comboDiversity(combo.map(c => c.artist));
+    if (div > bestDiv) { bestDiv = div; bestCombo = combo; }
+  }
+  selected = bestCombo;
+  // Track lead for anti-repetition
+  recentLeads.push(selected[0].artist.tag);
+  if (recentLeads.length > MAX_RECENT_LEADS) recentLeads.shift();
+  renderPool();
+  renderWeights();
+  renderOutput();
+  checkConflicts();
+  showRecoExplain(bestDiv);
+}
+
+
+// =============================================
+// Exclude Artists (v3.7.3)
+// =============================================
+function toggleExclude(artist) {
+  if (excludedTags.has(artist.tag)) excludedTags.delete(artist.tag);
+  else excludedTags.add(artist.tag);
+  localStorage.setItem('artist_excluded', JSON.stringify([...excludedTags]));
+  renderPool();
+}
+function clearExcluded() {
+  excludedTags.clear();
+  localStorage.setItem('artist_excluded', '[]');
+  renderPool();
+}
+
+// =============================================
+// Batch Preview (v3.7.3)
+// =============================================
+function batchComboDistance(a, b) {
+  const tagsA = new Set(a.combo.map(c => c.artist.tag));
+  const tagsB = new Set(b.combo.map(c => c.artist.tag));
+  let shared = 0;
+  tagsA.forEach(t => { if (tagsB.has(t)) shared++; });
+  const union = tagsA.size + tagsB.size - shared;
+  return union > 0 ? 1 - shared / union : 0;
+}
+function selectDiverseBatch(candidates, n) {
+  if (candidates.length <= n) return candidates.sort((a,b) => b.quality - a.quality);
+  candidates.sort((a,b) => b.quality - a.quality);
+  const chosen = [candidates[0]];
+  const rest = candidates.slice(1);
+  while (chosen.length < n && rest.length > 0) {
+    let bestIdx = 0, bestScore = -1;
+    for (let i = 0; i < rest.length; i++) {
+      let minDist = Infinity;
+      for (const c of chosen) minDist = Math.min(minDist, batchComboDistance(rest[i], c));
+      const score = minDist * 0.6 + rest[i].quality * 0.4;
+      if (score > bestScore) { bestScore = score; bestIdx = i; }
+    }
+    chosen.push(rest.splice(bestIdx, 1)[0]);
+  }
+  return chosen;
+}
+function showBatchPreview(candidates) {
+  const el = document.getElementById('batchPreview');
+  if (!candidates || candidates.length === 0) { el.style.display = 'none'; return; }
+  _batchCandidates = candidates;
+  const roleN = {lead:'主',support:'辅',accent:'点'};
+  let html = '<div class="card" style="animation:cardSlideIn 0.3s ease-out;padding:8px 14px">';
+  html += '<div class="card-title" style="margin-bottom:4px;font-size:13px">推荐方案 <span>点击选用</span></div>';
+  html += '<div class="batch-grid">';
+  candidates.forEach((c, i) => {
+    const names = c.combo.map(s => s.artist.name).join(' + ');
+    const roles = c.combo.map(s => roleN[s.role]||'?').join('');
+    const cc = c.compat >= 0.6 ? 'var(--green)' : c.compat >= 0.3 ? 'var(--orange)' : 'var(--red)';
+    html += '<div class="batch-card' + (i===0?' picked':'') + '" onclick="applyBatchCombo(' + i + ')">';
+    html += '<span class="batch-card-no">#' + (i+1) + '</span>';
+    html += '<span class="batch-card-artists">' + names + '</span>';
+    html += '<span class="batch-card-meta">';
+    html += '<span>' + roles + '</span>';
+    html += '<span>兼容<span class="batch-card-score" style="color:' + cc + '">' + Math.round(c.compat*100) + '</span></span>';
+    html += '</span></div>';
+  });
+  html += '</div></div>';
+  el.innerHTML = html;
+  el.style.display = 'block';
+  applyBatchCombo(0);
+}
+function applyBatchCombo(idx) {
+  const c = _batchCandidates[idx];
+  if (!c) return;
+  saveState();
+  selected = c.combo.map(s => ({artist:s.artist, role:s.role, weight:s.weight}));
+  recentLeads.push(selected[0].artist.tag);
+  if (recentLeads.length > MAX_RECENT_LEADS) recentLeads.shift();
+  renderPool(); renderWeights(); renderOutput(); checkConflicts();
+  showRecoExplain(c.diversity);
+  const _bcEl = document.getElementById('batchPreview');
+  if (_bcEl) _bcEl.querySelectorAll('.batch-card').forEach((el,i) => el.classList.toggle('picked', i===idx));
+}
+
+// =============================================
+// History
+// =============================================
+function saveToHistory() {
+  if (selected.length === 0) return;
+  const str = selected.map(s => `(${s.artist.tag}:${s.weight.toFixed(1)})`).join(', ') + ',';
+  if (!comboHistory.includes(str)) {
+    comboHistory.unshift(str);
+    if (comboHistory.length > 30) comboHistory.pop();
+    localStorage.setItem('artist_history', JSON.stringify(comboHistory));
+    renderHistory();
+  }
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyList');
+  if (comboHistory.length === 0) { el.innerHTML = '<div class="history-empty">暂无保存的画师串</div>'; return; }
+  el.innerHTML = comboHistory.map((h,i) => `<div class="history-item" onclick="restoreHistory(${i})">${h}</div>`).join('');
+}
+
+function parseComboString(str) {
+  str = str.replace(/,\s*$/, '');
+  const parts = str.match(/\([^()]*(?:\\\([^()]*\\\)[^()]*)*:\d+\.?\d*\)/g);
+  if (!parts) return null;
+  const roles = ['lead','support','accent','accent'];
+  const result = [];
+  parts.forEach((p, i) => {
+    const m = p.match(/^\((.+):(\d+\.?\d*)\)$/);
+    if (!m) return;
+    const tag = m[1], weight = parseFloat(m[2]);
+    const artist = ARTIST_BY_TAG.get(tag);
+    if (artist) result.push({artist, role: roles[i]||'accent', weight});
+  });
+  return result.length > 0 ? result : null;
+}
+
+function restoreHistory(idx) {
+  const combo = parseComboString(comboHistory[idx]);
+  if (!combo) return;
+  if (selected.length > 0) saveState();
+  redoStack = [];
+  selected = combo;
+  renderPool(); renderWeights(); renderOutput(); checkConflicts();
+}
+
+// =============================================
+// Artist Detail Card
+// =============================================
+
+// v3.7.4: Find similar artists by Euclidean distance on 20-dim vectors
+const _similarCache = new Map();
+function findSimilar(artist, n) {
+  n = n || 5;
+  let all = _similarCache.get(artist.tag);
+  if (!all) {
+    const vA = getVec(artist);
+    if (!vA) return [];
+    all = [];
+    ARTISTS.forEach(a => {
+      if (a.tag === artist.tag) return;
+      const vB = getVec(a);
+      if (!vB) return;
+      let sumSq = 0;
+      for (let d = 0; d < VEC_DIM_COUNT; d++) { const diff = vA[d] - vB[d]; sumSq += diff * diff; }
+      all.push({artist: a, similarity: 1 - Math.sqrt(sumSq / VEC_DIM_COUNT)});
+    });
+    all.sort((a,b) => b.similarity - a.similarity);
+    _similarCache.set(artist.tag, all);
+  }
+  return all.slice(0, n);
+}
+
+// v3.7.4: Combo strength indicator
+function updateStrength() {
+  const el = document.getElementById('strengthIndicator');
+  if (!el) return;
+  if (selected.length === 0) { el.innerHTML = ''; return; }
+  const strengthMap = {S:3, A:2, B:1};
+  let wSum = 0, wTotal = 0;
+  selected.forEach(s => {
+    const sv = strengthMap[s.artist.strength] || 1;
+    wSum += sv * s.weight;
+    wTotal += s.weight;
+  });
+  const avg = wTotal > 0 ? wSum / wTotal : 0;
+  let label, cls;
+  if (avg >= 2.3) { label = '强力'; cls = 'strong'; }
+  else if (avg >= 1.5) { label = '均衡'; cls = 'balanced'; }
+  else { label = '轻柔'; cls = 'light'; }
+  let warn = '';
+  const totalW = selected.reduce((s,x) => s + x.weight, 0);
+  if (totalW > 2.5) warn = ' <span class="si-warn">权重偏高</span>';
+  else if (totalW < 0.8) warn = ' <span class="si-warn">权重偏低</span>';
+  el.innerHTML = '<span class="si-label ' + cls + '">' + label + '</span>' + warn;
+}
+
+// v3.7.4: Mini hover preview
+function initMiniPreview() {
+  _previewEl = document.getElementById('miniPreview');
+}
+function showMiniPreview(artist, e) {
+  if (_previewTimer) { clearTimeout(_previewTimer); _previewTimer = null; }
+  if (_previewEl) _previewEl.style.display = 'none';
+  _previewTimer = setTimeout(() => {
+    if (!_previewEl) return;
+    const topDims = getTopDims(artist).slice(0, 5);
+    let h = '<div class="mp-name">' + artist.name + ' <span style="font-size:10px;color:var(--text3)">' + artist.strength + '级</span></div>';
+    if (topDims.length > 0) {
+      h += '<div class="mp-dims">';
+      const colors = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6'];
+      topDims.forEach((d,i) => {
+        h += '<div class="mp-dim-row"><span class="mp-dim-label">' + VEC_DIM_LABELS[d.dim] + '</span>';
+        h += '<div class="mp-dim-bar"><div class="mp-dim-fill" style="width:' + (d.val*100) + '%;background:' + colors[i%5] + '"></div></div>';
+        h += '<span style="font-size:9px;width:20px;text-align:right">' + d.val.toFixed(1) + '</span></div>';
+      });
+      h += '</div>';
+    }
+    if (selected.length > 0) {
+      const cs = compatScore(artist, selected[0].artist);
+      const cc = cs >= 0.6 ? 'var(--green)' : cs >= 0.3 ? 'var(--orange)' : 'var(--red)';
+      h += '<div class="mp-compat">与主画师兼容: <span style="color:' + cc + ';font-weight:600">' + Math.round(cs*100) + '</span></div>';
+    }
+    const sim = findSimilar(artist, 3);
+    if (sim.length > 0) {
+      h += '<div class="mp-similar">相似: ' + sim.map(s => s.artist.name).join(', ') + '</div>';
+    }
+    _previewEl.innerHTML = h;
+    _previewEl.style.left = Math.min(_lastMouseX + 12, window.innerWidth - 216) + 'px';
+    _previewEl.style.top = Math.min(_lastMouseY + 12, window.innerHeight - 200) + 'px';
+    _previewEl.style.display = 'block';
+  }, 1000);
+}
+function hideMiniPreview() {
+  if (_previewTimer) { clearTimeout(_previewTimer); _previewTimer = null; }
+  if (_previewEl) _previewEl.style.display = 'none';
+}
+
+function showDetail(artist) {
+  const vec = getVec(artist);
+  const topDims = getTopDims(artist);
+  const card = document.getElementById('detailCard');
+
+  // Header
+  let html = `<span class="detail-close" onclick="closeDetail()">&times;</span>`;
+  html += `<div class="detail-header">`;
+  html += `<div class="detail-name">${artist.name}</div>`;
+  html += `<div class="detail-tag">${artist.tag}</div>`;
+  html += `<div class="detail-meta">`;
+  html += `<span class="detail-badge strength-${artist.strength}">${artist.strength}级</span>`;
+  artist.roles.forEach(r => {
+    const rn = {lead:'主画师',support:'辅助',accent:'点缀'}[r]||r;
+    html += `<span class="detail-badge role">${rn}</span>`;
+  });
+  artist.styles.forEach(s => {
+    html += `<span class="detail-badge style">${s}</span>`;
+  });
+  html += `</div>`;
+  _detailArtist = artist;
+  const _exBtn = excludedTags.has(artist.tag) ? '\u53D6\u6D88\u6392\u9664' : '\u6392\u9664\u6B64\u753B\u5E08';
+  const _exClr = excludedTags.has(artist.tag) ? 'var(--green)' : 'var(--red)';
+  html += `<div style="margin-top:8px"><button onclick="toggleExclude(_detailArtist);closeDetail()" style="font-size:11px;padding:3px 10px;border:1px solid ${_exClr};border-radius:12px;background:transparent;color:${_exClr};cursor:pointer;font-family:var(--font)">${_exBtn}</button>${excludedTags.has(artist.tag)?'<span style=\"font-size:10px;color:var(--text3);margin-left:6px\">\u5DF2\u4ECE\u63A8\u8350\u4E2D\u6392\u9664</span>':''}</div>`;
+  html += `</div>`;
+
+  // Dim summary
+  if (topDims.length > 0) {
+    const summary = topDims.slice(0,4).map(d => `${VEC_DIM_LABELS[d.dim]} ${d.val.toFixed(1)}`).join('、');
+    html += `<div class="detail-dims-summary">特征: ${summary}</div>`;
+  }
+
+  // Vector bars (8 pairs)
+  if (vec) {
+    html += `<div class="detail-section"><div class="detail-section-title">20维风格向量</div>`;
+    const pairs = [
+      [0,1,'锐利','柔和','#3b82f6','#a78bfa'],
+      [2,3,'鲜艳','低饱和','#f59e0b','#94a3b8'],
+      [4,5,'暖色','冷色','#ef4444','#3b82f6'],
+      [6,7,'戏剧光','平光','#f59e0b','#6b7280'],
+      [8,9,'高细节','简约','#10b981','#94a3b8'],
+      [10,11,'强烈','温和','#ef4444','#a78bfa'],
+      [12,13,'写实','风格化','#6366f1','#ec4899'],
+      [14,15,'暗调','明亮','#374151','#fbbf24'],
+      [16,17,'繁密','极简','#f97316','#06b6d4'],
+      [18,19,'质感','光滑','#78716c','#a3e635']
+    ];
+    pairs.forEach(([a,b,la,lb,ca,cb]) => {
+      html += `<div class="detail-vec-row">`;
+      html += `<span class="detail-vec-label">${la}</span>`;
+      html += `<div class="detail-vec-track"><div class="detail-vec-fill" style="width:${vec[a]*100}%;background:${ca}"></div></div>`;
+      html += `<span class="detail-vec-val">${vec[a].toFixed(1)}</span>`;
+      html += `</div>`;
+      html += `<div class="detail-vec-row">`;
+      html += `<span class="detail-vec-label">${lb}</span>`;
+      html += `<div class="detail-vec-track"><div class="detail-vec-fill" style="width:${vec[b]*100}%;background:${cb}"></div></div>`;
+      html += `<span class="detail-vec-val">${vec[b].toFixed(1)}</span>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Compatibility with currently selected artists
+  if (selected.length > 0) {
+    html += `<div class="detail-section"><div class="detail-section-title">与当前组合的兼容性</div>`;
+    selected.forEach(s => {
+      const score = compatScore(artist, s.artist);
+      const pct = Math.round(score * 100);
+      const color = score >= 0.6 ? '#10b981' : score >= 0.3 ? '#f59e0b' : '#ef4444';
+      const roleN = {lead:'主',support:'辅',accent:'点'}[s.role]||s.role;
+      html += `<div class="detail-compat-item">`;
+      html += `<span class="detail-compat-name">${s.artist.name} <span style="color:var(--text3);font-weight:400">(${roleN})</span></span>`;
+      html += `<span class="detail-compat-score" style="color:${color}">${pct}</span>`;
+      html += `<div class="detail-compat-bar"><div class="detail-compat-fill" style="width:${pct}%;background:${color}"></div></div>`;
+      html += `</div>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<div class="detail-section"><div style="font-size:12px;color:var(--text3)">先选择画师，此处会显示与已选画师的兼容性评分</div></div>`;
+  }
+
+  // Similar artists
+  const simList = findSimilar(artist, 6);
+  if (simList.length > 0) {
+    html += '<div class="detail-similar"><div class="detail-similar-title">相似画师</div><div class="detail-similar-list">';
+    simList.forEach(si => {
+      const pct = Math.round(si.similarity * 100);
+      const tagSafe = si.artist.tag.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      html += '<span class="detail-similar-item" onclick="closeDetail();showDetail(ARTIST_BY_TAG.get(\'' + tagSafe + '\'))">' + si.artist.name + '<span class="detail-similar-pct">' + pct + '%</span></span>';
+    });
+    html += '</div></div>';
+  }
+
+  card.innerHTML = html;
+  document.getElementById('detailOverlay').classList.add('show');
+  lockScroll();
+}
+
+function showVecHelp() {
+  const card = document.getElementById('vecHelpCard');
+  const pairs = [
+    ['锐利','柔和','线条锐利程度。锐利=硬边线条，柔和=柔焦朦胧'],
+    ['鲜艳','低饱和','色彩饱和度。鲜艳=高饱和明快，低饱和=灰调淡彩'],
+    ['暖色','冷色','色温倾向。暖=橙红黄调，冷=蓝紫青调'],
+    ['戏剧光','平光','光影对比度。戏剧光=强明暗对比，平光=均匀柔光'],
+    ['高细节','简约','画面细节密度。高细节=精密描绘，简约=极简线条'],
+    ['强烈','温和','情绪能量。强烈=冲击力紧张感，温和=柔软治愈'],
+    ['写实','风格化','写实程度。写实=接近照片，风格化=夸张变形'],
+    ['暗调','明亮','画面整体明度。暗调=低key暗沉，明亮=高key通透'],
+    ['繁密','极简','构图密度。繁密=信息量大，极简=留白多'],
+    ['质感','光滑','表面质感。质感=笔触颗粒感，光滑=数码平滑']
+  ];
+  let html = '<span class="vec-help-close" onclick="closeVecHelp()">&times;</span>';
+  html += '<div class="vec-help-title">20维语义向量说明</div>';
+  html += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">';
+  html += '每位画师用10对对立维度描述风格特征，每维取值0.0~1.0。<br>';
+  html += '对立维度同时高值会产生<b>冲突</b>，降低兼容度评分。</div>';
+  pairs.forEach(p => {
+    html += '<div class="vec-help-pair">';
+    html += '<span class="vec-help-dim">' + p[0] + '</span>';
+    html += '<span class="vec-help-vs">vs</span>';
+    html += '<span class="vec-help-dim" style="text-align:left">' + p[1] + '</span>';
+    html += '<span class="vec-help-desc">' + p[2] + '</span>';
+    html += '</div>';
+  });
+  html += '<div style="margin-top:12px;font-size:11px;color:var(--text3);line-height:1.6">';
+  html += '冲突判定: 画师A某维度高 + 画师B对立维度高 = 该对维度冲突。';
+  html += '多个维度冲突叠加降低兼容度。</div>';
+  card.innerHTML = html;
+  document.getElementById('vecHelpOverlay').classList.add('show');
+  lockScroll();
+}
+
+function closeVecHelp() {
+  document.getElementById('vecHelpOverlay').classList.remove('show');
+  setTimeout(unlockScroll, 260);
+}
+
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('show');
+  setTimeout(unlockScroll, 260);
+}
+
+// =============================================
+// Combo Compare
+// =============================================
+let compareSlots = { A: null, B: null };
+
+function saveToCompare(slot) {
+  if (selected.length === 0) return;
+  const artists = selected.map(s => s.artist);
+  const str = selected.map(s => `(${s.artist.tag}:${s.weight.toFixed(1)})`).join(', ') + ',';
+  const score = comboScore(artists);
+  // Compute average vector
+  const avgVec = new Array(VEC_DIM_COUNT).fill(0);
+  artists.forEach(a => {
+    const v = getVec(a);
+    if (v) v.forEach((val, i) => avgVec[i] += val);
+  });
+  avgVec.forEach((_, i) => avgVec[i] /= artists.length);
+
+  compareSlots[slot] = { str, score, avgVec, names: artists.map(a=>a.name) };
+  renderCompare();
+  document.getElementById('comparePanel').classList.add('show');
+}
+
+function clearCompare() {
+  compareSlots = { A: null, B: null };
+  renderCompare();
+}
+
+function renderCompare() {
+  ['A','B'].forEach(slot => {
+    const el = document.getElementById('compareSlot' + slot);
+    const data = compareSlots[slot];
+    if (!data) {
+      el.innerHTML = `<div class="compare-slot-title">组合 ${slot}</div><div class="compare-slot-empty">保存当前组合到此槽位</div>`;
+      return;
+    }
+    const scoreColor = data.score >= 0.6 ? 'var(--green)' : data.score >= 0.3 ? 'var(--orange)' : 'var(--red)';
+    el.innerHTML = `
+      <div class="compare-slot-title">组合 ${slot}</div>
+      <div class="compare-slot-str">${data.str}</div>
+      <div class="compare-slot-score" style="color:${scoreColor}">${Math.round(data.score*100)}</div>
+      <div class="compare-slot-label">兼容度</div>
+    `;
+  });
+
+  // Vector overlay chart
+  const chart = document.getElementById('compareVecChart');
+  if (!compareSlots.A || !compareSlots.B) { chart.innerHTML = ''; return; }
+  const vA = compareSlots.A.avgVec, vB = compareSlots.B.avgVec;
+  const pairs = [
+    [0,'锐利'],[1,'柔和'],[2,'鲜艳'],[3,'低饱和'],[4,'暖色'],[5,'冷色'],
+    [6,'戏剧光'],[7,'平光'],[8,'高细节'],[9,'简约'],[10,'强烈'],[11,'温和'],
+    [12,'写实'],[13,'风格化'],[14,'暗调'],[15,'明亮'],[16,'繁密'],[17,'极简'],
+    [18,'质感'],[19,'光滑']
+  ];
+  let html = '<div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:6px">平均向量对比</div>';
+  pairs.forEach(([i, label]) => {
+    const wA = Math.round(vA[i]*100), wB = Math.round(vB[i]*100);
+    html += `<div class="compare-vec-row">
+      <span class="compare-vec-label">${label}</span>
+      <div class="compare-vec-track">
+        <div class="compare-vec-fill-a" style="width:${wA}%;background:#60a5fa"></div>
+        <div class="compare-vec-fill-b" style="width:${wB}%;background:#f97316"></div>
+      </div>
+      <span style="min-width:20px;text-align:right;color:var(--text3);font-family:'SF Mono',monospace;font-size:9px">${vA[i].toFixed(1)}</span>
+      <span style="min-width:20px;text-align:right;color:var(--text3);font-family:'SF Mono',monospace;font-size:9px">${vB[i].toFixed(1)}</span>
+    </div>`;
+  });
+  html += `<div class="compare-legend">
+    <span><span class="compare-legend-dot" style="background:#60a5fa"></span>A: ${compareSlots.A.names.join('+')}</span>
+    <span><span class="compare-legend-dot" style="background:#f97316"></span>B: ${compareSlots.B.names.join('+')}</span>
+  </div>`;
+  chart.innerHTML = html;
+}
+
+// =============================================
+// Favorites
+// =============================================
+let favorites = JSON.parse(localStorage.getItem('artist_favorites') || '[]');
+
+function promptFavorite() {
+  if (selected.length === 0) return;
+  const str = selected.map(s => `(${s.artist.tag}:${s.weight.toFixed(1)})`).join(', ') + ',';
+  // Check if already favorited
+  if (favorites.some(f => f.str === str)) {
+    const hint = document.querySelector('.copy-hint');
+    if (hint) { hint.textContent = '已在收藏夹中'; setTimeout(() => { if (hint) hint.textContent = '点击复制'; }, 1200); }
+    return;
+  }
+  const names = selected.map(s => s.artist.name).join(' + ');
+  const defaultName = names.length > 30 ? names.substring(0, 27) + '...' : names;
+  const name = prompt('给这个组合起个名字：', defaultName);
+  if (name === null) return; // cancelled
+  addFavorite(name || defaultName, str);
+}
+
+function addFavorite(name, str) {
+  favorites.unshift({name, str, ts: Date.now()});
+  if (favorites.length > 50) favorites.pop();
+  localStorage.setItem('artist_favorites', JSON.stringify(favorites));
+  renderFavorites();
+}
+
+function removeFavorite(idx) {
+  favorites.splice(idx, 1);
+  localStorage.setItem('artist_favorites', JSON.stringify(favorites));
+  renderFavorites();
+}
+
+function renderFavorites() {
+  const el = document.getElementById('favList');
+  if (favorites.length === 0) {
+    el.innerHTML = '<div class="fav-empty">暂无收藏的组合</div>';
+    return;
+  }
+  el.innerHTML = favorites.map((f, i) => `
+    <div class="fav-item">
+      <div class="fav-item-text" onclick="restoreFavorite(${i})">
+        <div class="fav-item-name">${f.name.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")}</div>
+        <div class="fav-item-str">${f.str}</div>
+      </div>
+      <span class="fav-del" onclick="event.stopPropagation();removeFavorite(${i})" title="删除">x</span>
+    </div>
+  `).join('');
+}
+
+function restoreFavorite(idx) {
+  const combo = parseComboString(favorites[idx].str);
+  if (!combo) return;
+  if (selected.length > 0) saveState();
+  redoStack = [];
+  selected = combo;
+  renderPool(); renderWeights(); renderOutput(); checkConflicts();
+}
+
+function exportComboJSON() {
+  if (selected.length === 0) { alert('请先选择画师'); return; }
+  const data = {
+    version: VERSION,
+    combo: selected.map(s => ({
+      tag: s.artist.tag,
+      name: s.artist.name,
+      role: s.role,
+      weight: s.weight
+    }))
+  };
+  const json = JSON.stringify(data, null, 2);
+  navigator.clipboard.writeText(json).then(() => {
+    const hint = document.querySelector('.copy-hint');
+    if (hint) { hint.textContent = 'JSON已复制'; setTimeout(() => hint.textContent = '点击复制', 1500); }
+  }).catch(() => {
+    prompt('复制以下JSON:', json);
+  });
+}
+
+function importComboJSON() {
+  const input = prompt('粘贴组合JSON:');
+  if (!input) return;
+  try {
+    const data = JSON.parse(input);
+    const items = data.combo || (Array.isArray(data) ? data : null);
+    if (!items) { alert('无效的JSON格式'); return; }
+    const roles = ['lead','support','accent','accent'];
+    const weights = [1.0, 0.8, 0.6, 0.4];
+    const combo = items.map((item, i) => {
+      const artist = ARTIST_BY_TAG.get(item.tag);
+      if (!artist) return null;
+      return {
+        artist,
+        role: item.role || roles[i] || 'accent',
+        weight: item.weight || weights[i] || 0.4
+      };
+    }).filter(Boolean);
+    if (combo.length === 0) { alert('未找到匹配的画师'); return; }
+    saveState();
+    selected = combo;
+    renderPool(); renderWeights(); renderOutput(); checkConflicts();
+  } catch (e) {
+    alert('JSON格式错误: ' + e.message);
+  }
+}
+
+function clearFavorites() {
+  if (favorites.length === 0) return;
+  if (!confirm('确定清空所有收藏？')) return;
+  favorites = [];
+  localStorage.setItem('artist_favorites', JSON.stringify(favorites));
+  renderFavorites();
+}
+
+// =============================================
+// Init
+// =============================================
+init();
+</script>
+
+<!-- Vector Help Modal -->
+<div class="vec-help-overlay" id="vecHelpOverlay" onclick="if(event.target===this)closeVecHelp()">
+  <div class="vec-help-card" id="vecHelpCard"></div>
+</div>
+
+<!-- Artist Detail Modal -->
+<div class="detail-overlay" id="detailOverlay" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-card" id="detailCard"></div>
+</div>
+
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// --- Ribbon Background Setup ---
+const canvas = document.getElementById('ribbonCanvas');
+if (canvas) {
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, 5);
+  camera.lookAt(0, 0, 0);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // --- Color gradient texture ---
+  function createGradientTexture() {
+    const size = 512;
+    const c2d = document.createElement('canvas');
+    c2d.width = size; c2d.height = 1;
+    const ctx = c2d.getContext('2d');
+    const grad = ctx.createLinearGradient(0, 0, size, 0);
+    grad.addColorStop(0.00, '#FFD700');
+    grad.addColorStop(0.06, '#FFa830');
+    grad.addColorStop(0.14, '#FF7B3A');
+    grad.addColorStop(0.22, '#FF5252');
+    grad.addColorStop(0.30, '#F83878');
+    grad.addColorStop(0.38, '#EE30A8');
+    grad.addColorStop(0.46, '#D035D0');
+    grad.addColorStop(0.54, '#A845F0');
+    grad.addColorStop(0.62, '#7055F8');
+    grad.addColorStop(0.70, '#4A6AFF');
+    grad.addColorStop(0.78, '#2D8CF5');
+    grad.addColorStop(0.86, '#18B0E8');
+    grad.addColorStop(0.94, '#10D0C8');
+    grad.addColorStop(1.00, '#00F5A0');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, 1);
+    const tex = new THREE.CanvasTexture(c2d);
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  const gradientTex = createGradientTexture();
+
+  // --- Custom shader material ---
+  const ribbonMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      uGradient: { value: gradientTex },
+      uTime: { value: 0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+      void main() {
+        vUv = uv;
+        vNormal = normalize(normalMatrix * normal);
+        vPosition = (modelViewMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform sampler2D uGradient;
+      uniform float uTime;
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vPosition;
+
+      void main() {
+        float uShift = vUv.x + vUv.y * 0.08 + sin(vUv.y * 6.28 + uTime * 0.15) * 0.015;
+        vec3 baseColor = texture2D(uGradient, vec2(clamp(uShift, 0.0, 1.0), 0.5)).rgb;
+        float gray = dot(baseColor, vec3(0.299, 0.587, 0.114));
+        baseColor = mix(vec3(gray), baseColor, 1.0); // saturate (was 1.15, spec violation)
+        vec3 light1 = normalize(vec3(-0.3, 0.5, 1.0));
+        vec3 light2 = normalize(vec3(0.5, -0.2, 0.6));
+        float diff1 = dot(vNormal, light1) * 0.5 + 0.5;
+        float diff2 = dot(vNormal, light2) * 0.5 + 0.5;
+        float diff = 0.78 + 0.15 * diff1 + 0.07 * diff2;
+        vec3 viewDir = normalize(-vPosition);
+        vec3 halfDir = normalize(light1 + viewDir);
+        float spec = pow(max(dot(vNormal, halfDir), 0.0), 80.0) * 0.12;
+        vec3 halfDir2 = normalize(light2 + viewDir);
+        float spec2 = pow(max(dot(vNormal, halfDir2), 0.0), 30.0) * 0.05;
+        float centerGlow = 1.0 - 2.0 * abs(vUv.x - 0.5);
+        centerGlow = 0.93 + 0.07 * centerGlow * centerGlow;
+        vec3 col = baseColor * diff * centerGlow;
+        col += vec3(1.0, 0.98, 0.96) * spec;
+        col += baseColor * 0.5 * spec2;
+        float edgeFade = smoothstep(0.0, 0.05, vUv.x) * smoothstep(1.0, 0.95, vUv.x);
+        gl_FragColor = vec4(col, edgeFade);
+      }
+    `,
+    transparent: true,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  // --- Build ribbon mesh geometry ---
+  const RIBBON_COUNT = 48;
+  const SEGMENTS = 80;
+  const ribbons = [];
+
+  for (let r = 0; r < RIBBON_COUNT; r++) {
+    const geo = new THREE.PlaneGeometry(1, 1, 1, SEGMENTS);
+    const uMin = r / RIBBON_COUNT;
+    const uMax = (r + 1) / RIBBON_COUNT;
+    const _uv = geo.attributes.uv;
+    for (let j = 0; j <= SEGMENTS; j++) { const frac = j / SEGMENTS; for (let i = 0; i <= 1; i++) _uv.setXY(j * 2 + i, uMin + (uMax - uMin) * i, frac); }
+    _uv.needsUpdate = true;
+    ribbons.push({
+      mesh: new THREE.Mesh(geo, ribbonMaterial),
+      geo, uMin, uMax, index: r,
+      phase: r * 0.15,
+      speed: 0.5 + (r % 7) * 0.06,
+      waveAmp: 0.015 + Math.abs(r / RIBBON_COUNT - 0.5) * 0.035,
+      width: 0.016 + 0.014 * (0.5 + 0.5 * Math.sin(r * 1.7 + 0.3)),
+    });
+    scene.add(ribbons[r].mesh);
+  }
+
+  // --- Animate geometry each frame ---
+  let frameCount = 0;
+
+  function updateRibbons(time, count) {
+    const t = time;
+    for (let r = 0; r < count; r++) {
+      const rb = ribbons[r];
+      const pos = rb.geo.attributes.position;
+      const segsY = SEGMENTS;
+      const segsX = 1;
+
+      for (let j = 0; j <= segsY; j++) {
+        const frac = j / segsY;
+        const pathFrac = frac * 2.4 - 0.7;
+        const baseX = 1.5 + pathFrac * -2.5;
+        const baseY = 2.0 + pathFrac * -4.0;
+        const foldPos = 0.5 + Math.sin(t * 0.1) * 0.05;
+        const bendT = 0.5 + 0.5 * Math.tanh((frac - foldPos) * 8);
+        const bendAngle = 0.78 * bendT;
+        const pastFold = Math.max(frac - foldPos, 0);
+        const bendOffsetX = Math.sin(bendAngle) * pastFold * 2.2;
+        const bendOffsetY = (1 - Math.cos(bendAngle)) * pastFold * 0.8;
+        const wave = Math.sin(frac * 8 + t * rb.speed + rb.phase) * rb.waveAmp
+                   + Math.sin(frac * 13 + t * rb.speed * 0.6 + rb.phase * 1.4) * rb.waveAmp * 0.4;
+        const twist = Math.tanh((frac - foldPos) * 4);
+        const ribbonAngle = (rb.index / RIBBON_COUNT) * Math.PI * 2 + t * 0.06;
+        const spreadPos = Math.sin(ribbonAngle) * 0.5;
+        const depthPos = Math.cos(ribbonAngle);
+        const distFromFold = Math.abs(frac - foldPos);
+        const endFactor = 1.0 + 3.0 * Math.pow(2 * distFromFold, 2);
+        const spread = spreadPos * 1.2 * twist * endFactor;
+        const swayAmount = Math.sin(t * 0.12) * 0.15 + Math.sin(t * 0.07 + 0.8) * 0.08;
+        const sway = swayAmount * (1.0 + distFromFold * 1.5);
+        const baseAngle = 0.54;
+        const rotAngle = baseAngle + Math.sin(t * 0.08) * 0.2;
+        const perpX = Math.cos(rotAngle);
+        const perpY = Math.sin(rotAngle);
+        const totalDisp = wave + spread + sway;
+        const ribbonWidth = rb.width;
+
+        for (let i = 0; i <= segsX; i++) {
+          const side = (i / segsX) - 0.5;
+          const idx = j * (segsX + 1) + i;
+          const x = baseX + bendOffsetX + perpX * totalDisp + side * ribbonWidth * perpY;
+          const y = baseY + bendOffsetY + perpY * totalDisp + side * ribbonWidth * (-perpX);
+          const z = depthPos * 0.15 + Math.sin(frac * 3.14 + rb.phase * 0.2) * 0.03;
+          pos.setXYZ(idx, x, y, z);
+        }
+      }
+      pos.needsUpdate = true;
+    }
+  }
+
+  // --- Render loop with adaptive quality ---
+  let lastFrameTime = 0;
+  let FRAME_INTERVAL = 1000 / 30; // cap at 30fps
+  let fpsHistory = [];
+  let activeRibbonCount = RIBBON_COUNT;
+
+  function animate(ts) {
+    requestAnimationFrame(animate);
+    if (ts - lastFrameTime < FRAME_INTERVAL) return;
+    const dt = ts - lastFrameTime;
+    lastFrameTime = ts;
+    frameCount++;
+    // FPS monitoring: degrade if consistently below 20fps
+    if (frameCount % 30 === 0 && dt > 0) {
+      fpsHistory.push(1000 / dt);
+      if (fpsHistory.length > 5) fpsHistory.shift();
+      const avgFps = fpsHistory.reduce((a,b)=>a+b,0) / fpsHistory.length;
+      if (avgFps < 18 && activeRibbonCount > 16) {
+        activeRibbonCount = Math.max(16, activeRibbonCount - 8);
+        for (let r = activeRibbonCount; r < RIBBON_COUNT; r++) ribbons[r].mesh.visible = false;
+      } else if (avgFps > 28 && activeRibbonCount < RIBBON_COUNT) {
+        activeRibbonCount = Math.min(RIBBON_COUNT, activeRibbonCount + 4);
+        for (let r = 0; r < activeRibbonCount; r++) ribbons[r].mesh.visible = true;
+      }
+    }
+    const time = ts * 0.001;
+    ribbonMaterial.uniforms.uTime.value = time;
+    updateRibbons(time, activeRibbonCount);
+    renderer.render(scene, camera);
+  }
+  requestAnimationFrame(animate);
+}
+</script>
+</body>
+</html>
